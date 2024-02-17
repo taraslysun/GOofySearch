@@ -1,0 +1,50 @@
+.main-search {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
+  height: 90vh;
+}
+
+.main-logo {
+  width: 18rem;
+  height: 12rem;
+  margin-bottom: 20px;
+}
+
+.main-search-container {
+  position: relative;
+  width: 30rem;
+}
+
+input[type="text"] {
+  width: 100%;
+  padding: 1rem;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  font-size: 16px;
+}
+
+.header-container {
+  margin-left: 3rem;
+}
+
+.header-search {
+  display: flex;
+  margin: 2rem 0;
+  align-items: center;
+}
+
+.header-logo {
+  width: 6rem;
+  height: 4rem;
+}
+
+.header-search-container {
+  width: 30rem;
+  margin-left: 2rem;
+}
+
+.header-results {
+  font-family: "Courier New", Courier, monospace;
+}
