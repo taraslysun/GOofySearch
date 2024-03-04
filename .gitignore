@@ -3,3 +3,4 @@
 ./priority_queue/go.mod
 ./go.sum
 ./.idea
+./dump.rdb
