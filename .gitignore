@@ -1,2 +1,4 @@
 /crawler/test_crawler/
 /crawler/*.json
+/crawler/go.mod
+/crawler/go.sum
