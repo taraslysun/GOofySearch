@@ -21,10 +21,10 @@ type Response struct {
 			Id     string  `json:"_id"`
 			Score  float64 `json:"_score"`
 			Source struct {
-				Name        string `json:"name"`
-				Author      string `json:"author"`
-				ReleaseDate string `json:"release_date"`
-				PageCount   int    `json:"page_count"`
+				Title string `json:"title"`
+				Text string `json:"text"`
+				Url string `json:"url"`
+
 			} `json:"_source"`
 		} `json:"hits"`
 	} `json:"hits"`

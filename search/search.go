@@ -13,7 +13,7 @@ func Search(query string, es *elasticsearch.Client) utils.Response {
 
 	searchResp, err := es.Search(
 		es.Search.WithContext(context.Background()),
-		es.Search.WithIndex("index_name"),
+		es.Search.WithIndex("test"),
 		es.Search.WithQuery(query),
 		es.Search.WithTrackTotalHits(true),
 		es.Search.WithPretty(),

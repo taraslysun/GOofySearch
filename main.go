@@ -1,7 +1,7 @@
 package main
 
 import (
-	"back/search"
+	// "back/search"
 	setup "back/search"
 	"back/server"
 )
@@ -9,7 +9,7 @@ import (
 func main() {
 
 	es := setup.CreateClient()
-	search.Ingest(es)
+	// search.Ingest(es)
 	server.Run(es)
 
 }
