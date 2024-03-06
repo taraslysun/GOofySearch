@@ -23,19 +23,19 @@ func Index(es *elasticsearch.Client, r *Result) {
         if err != nil {
             fmt.Println("error")
         }
+	
+    reader := bytes.NewReader(data)
 
-        reader := bytes.NewReader(data)
-
-        es.Index("index_name", reader)
+	es.Index("test", reader)
 }
 
 
-func Crawl(c *colly.Collector, url string, es *elasticsearch.Client) []string {
+func Crawl(c *colly.Collector, url *string, es *elasticsearch.Client) []string {
 
 	
 	var links []string
-	var r Result
-	r.Url = url
+	r := Result{"", "", ""}
+	r.Url = *url
 
 
 	c.OnHTML("html", func(e *colly.HTMLElement) {
@@ -43,7 +43,7 @@ func Crawl(c *colly.Collector, url string, es *elasticsearch.Client) []string {
 		  link := el.Attr("href")
 		  link = strings.Split(link, "#")[0]
 		  if !strings.Contains(link, "http") {
-			domain := strings.Split(url, "/")
+			domain := strings.Split(*url, "/")
 			link = domain[0] + "//" + domain[2] + link
 		  }
 		  links = append(links, link)
@@ -71,18 +71,15 @@ func Crawl(c *colly.Collector, url string, es *elasticsearch.Client) []string {
 		text = strings.ReplaceAll(text, "\n", " ")
 		text = strings.ReplaceAll(text, "\t", " ")
 		r.Text = text
-		
 	})
 
-	c.OnScraped(func(_ *colly.Response) {
-		Index(es, &r)
-	})
 
 	c.OnError(func(res *colly.Response, err error) {
 		fmt.Println("OnError: ", err)
 	})
 
-	c.Visit(url)
+	c.Visit(*url)
+	Index(es, &r)
 
 	return links
 

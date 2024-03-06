@@ -2,11 +2,12 @@ package task_manager
 
 import (
 	"fmt"
-	"github.com/elastic/go-elasticsearch/v8"
-	"github.com/gocolly/colly"
 	"net/url"
 	"time"
 	"webcrawler/crawler"
+
+	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/gocolly/colly"
 )
 
 type DomainParams struct {
@@ -34,6 +35,7 @@ func StateInit(links []string) map[string]*DomainParams {
 }
 
 func find(element string, checkLst []string) bool {
+
 	for _, elem := range checkLst {
 		if elem == element {
 			return true
@@ -42,8 +44,9 @@ func find(element string, checkLst []string) bool {
 	return false
 }
 
+
 func Run(c *colly.Collector, urlink string, es *elasticsearch.Client) {
-	links := crawler.Crawl(c, urlink, es)
+	links := crawler.Crawl(c, &urlink, es)
 	domains := StateInit(links)
 	for i := 0; i < 3; i++ {
 		for _, value := range domains {
@@ -66,7 +69,7 @@ func Run(c *colly.Collector, urlink string, es *elasticsearch.Client) {
 			if find(newLink, domains[newDomain].Visited) || find(newLink, domains[newDomain].Links) {
 				continue
 			} else {
-				newLinks := crawler.Crawl(c, newLink, es)
+				newLinks := crawler.Crawl(c, &newLink, es)
 				domains[newDomain].Visited = append(domains[newDomain].Visited, newLink)
 				for _, localLink := range newLinks {
 					parsedURL, err := url.Parse(localLink)
