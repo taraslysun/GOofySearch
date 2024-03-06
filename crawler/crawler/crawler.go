@@ -23,7 +23,7 @@ func Index(es *elasticsearch.Client, r *Result) {
         if err != nil {
             fmt.Println("error")
         }
-	
+	fmt.Println("Indexed url: ", r.Url)
     reader := bytes.NewReader(data)
 
 	es.Index("test", reader)
@@ -34,20 +34,27 @@ func Crawl(c *colly.Collector, url *string, es *elasticsearch.Client) []string {
 
 	
 	var links []string
+	var lang string = ""
 	r := Result{"", "", ""}
 	r.Url = *url
 
 
 	c.OnHTML("html", func(e *colly.HTMLElement) {
-		e.ForEach("a[href]", func(_ int, el *colly.HTMLElement) {
-		  link := el.Attr("href")
-		  link = strings.Split(link, "#")[0]
-		  if !strings.Contains(link, "http") {
-			domain := strings.Split(*url, "/")
-			link = domain[0] + "//" + domain[2] + link
-		  }
-		  links = append(links, link)
-		})
+
+		lang = e.Attr("lang")
+
+		if (lang == "en" || lang == "en-US") {
+			e.ForEach("a[href]", func(_ int, el *colly.HTMLElement) {
+				link := el.Attr("href")
+				link = strings.Split(link, "#")[0]
+				if !strings.Contains(link, "http") {
+				  domain := strings.Split(*url, "/")
+				  link = domain[0] + "//" + domain[2] + link
+				}
+				links = append(links, link)
+			  })
+		}
+		
 	  })
 	
 
@@ -79,8 +86,9 @@ func Crawl(c *colly.Collector, url *string, es *elasticsearch.Client) []string {
 	})
 
 	c.Visit(*url)
-	Index(es, &r)
-
+	if (lang == "en" || lang == "en-US") {
+		Index(es, &r)
+	}
 	return links
 
 }

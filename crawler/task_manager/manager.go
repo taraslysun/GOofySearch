@@ -48,7 +48,7 @@ func find(element string, checkLst []string) bool {
 func Run(c *colly.Collector, urlink string, es *elasticsearch.Client) {
 	links := crawler.Crawl(c, &urlink, es)
 	domains := StateInit(links)
-	for i := 0; i < 3; i++ {
+	for i := 0; i < 4; i++ {
 		for _, value := range domains {
 			var newLink string
 			if len(value.Links) > 0 {
