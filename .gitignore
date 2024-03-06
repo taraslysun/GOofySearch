@@ -2,3 +2,4 @@
 /crawler/*.json
 /crawler/go.mod
 /crawler/go.sum
+/crawler/utils/
