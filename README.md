@@ -8,7 +8,7 @@ Bohdan Ozarko https://github.com/Compi-Craft
 
 ## Prerequisites
 
-<mark>Node.js and npm, Vite, Golang</mark>
+<mark>Node.js and npm, Vite, Golang, ElasticSearch</mark>
 
 ### Usage
 
@@ -16,6 +16,8 @@ Bohdan Ozarko https://github.com/Compi-Craft
 <mark>To run application you need to run client side and server side.<br>
 First of all you have to execute server side, you can do this in app/api folder by running ```go run main.go```.<br>
 Go to client folder in app/, run ```npm i``` to install all dependencies, then ```npm run dev``` to run frontend.<br>
+Next step you have to fill your elasticsearch CloudId and APIKey in app/api/utils/vars.go.<br>
+If needed you can start crawling websites using our crawler, make the previous step in crawler/utils/vars.go and run it with command ```go run main.go```.<br>
 Now you can search!</mark> 
 
 ### Example
