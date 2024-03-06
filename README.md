@@ -1,5 +1,5 @@
 # Project : <mark>Mini Google</mark>
-Authors (team): 
+Authors (team): <br>
 <mark>Sviatoslav Stehnii https://github.com/sviatkohuet <br>
 Taras Lysun https://github.com/taraslysun <br>
 Dmytro Khamula https://github.com/hamuladm <br>
