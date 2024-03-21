@@ -13,43 +13,41 @@ import (
 
 type Result struct {
 	Title string `json:"title"`
-	Text string `json:"text"`
-	Url string `json:"url"`
+	Text  string `json:"text"`
+	Url   string `json:"url"`
 }
-
 
 func Index(es *elasticsearch.Client, r *Result) {
 	data, err := json.Marshal(r)
-        if err != nil {
-            fmt.Println("error")
-        }
-	
-    reader := bytes.NewReader(data)
+	if err != nil {
+		fmt.Println("error")
+	}
 
-	es.Index("test", reader)
+	reader := bytes.NewReader(data)
+
+	_, err = es.Index("test", reader)
+	if err != nil {
+		return
+	}
 }
-
 
 func Crawl(c *colly.Collector, url *string, es *elasticsearch.Client) []string {
 
-	
 	var links []string
 	r := Result{"", "", ""}
 	r.Url = *url
 
-
 	c.OnHTML("html", func(e *colly.HTMLElement) {
 		e.ForEach("a[href]", func(_ int, el *colly.HTMLElement) {
-		  link := el.Attr("href")
-		  link = strings.Split(link, "#")[0]
-		  if !strings.Contains(link, "http") {
-			domain := strings.Split(*url, "/")
-			link = domain[0] + "//" + domain[2] + link
-		  }
-		  links = append(links, link)
+			link := el.Attr("href")
+			link = strings.Split(link, "#")[0]
+			if !strings.Contains(link, "http") {
+				domain := strings.Split(*url, "/")
+				link = domain[0] + "//" + domain[2] + link
+			}
+			links = append(links, link)
 		})
-	  })
-	
+	})
 
 	c.OnHTML("head title", func(e *colly.HTMLElement) {
 		title := e.Text
@@ -58,7 +56,6 @@ func Crawl(c *colly.Collector, url *string, es *elasticsearch.Client) []string {
 		r.Title = title
 	})
 
-
 	c.OnHTML("html body", func(e *colly.HTMLElement) {
 
 		html := e.DOM
@@ -66,19 +63,20 @@ func Crawl(c *colly.Collector, url *string, es *elasticsearch.Client) []string {
 		html.Find("style").Remove()
 		html.Find("img").Remove()
 
-
 		text := html.Text()
 		text = strings.ReplaceAll(text, "\n", " ")
 		text = strings.ReplaceAll(text, "\t", " ")
 		r.Text = text
 	})
 
-
 	c.OnError(func(res *colly.Response, err error) {
 		fmt.Println("OnError: ", err)
 	})
 
-	c.Visit(*url)
+	err := c.Visit(*url)
+	if err != nil {
+		return nil
+	}
 	Index(es, &r)
 
 	return links
