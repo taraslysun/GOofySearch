@@ -9,8 +9,14 @@ import (
 
 func main() {
 	es := setup.CreateClient()
-	es.Indices.Delete([]string{"test"})
-	es.Indices.Create("test")
+	_, err := es.Indices.Delete([]string{"test"})
+	if err != nil {
+		return
+	}
+	_, err = es.Indices.Create("test")
+	if err != nil {
+		return
+	}
 	c := colly.NewCollector()
 	manager.Run(c, "https://www.wikipedia.org/", es)
 }

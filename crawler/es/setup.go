@@ -3,7 +3,7 @@ package es
 import (
 	"fmt"
 	"log"
-	utils "webcrawler/utils"
+	"webcrawler/utils"
 
 	"github.com/elastic/go-elasticsearch/v8"
 )
@@ -23,4 +23,3 @@ func CreateClient() *elasticsearch.Client {
 
 	return es
 }
-
