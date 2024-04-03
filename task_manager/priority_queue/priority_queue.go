@@ -16,9 +16,7 @@ type PriorityQueue struct {
 }
 
 func NewPriorityQueue() *PriorityQueue {
-	return &PriorityQueue{
-		queue: make([]Item, 0),
-	}
+	return &PriorityQueue{queue: make([]Item, 0)}
 }
 
 func (pq *PriorityQueue) Push(link Item) {
