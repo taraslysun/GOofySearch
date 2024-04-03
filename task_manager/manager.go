@@ -100,3 +100,12 @@ func main() {
 	log.Println("Task Manager server is running on port 8080...")
 	log.Fatal(http.ListenAndServe(":8080", r))
 }
+
+
+/* 
+to run the server, run the following command in the task_manager directory:
+   	go run manager.go
+to test the server, run the following command:
+	curl -X POST -d '["http://example.com"]' http://localhost:8080/links
+ 	curl -X GET http://localhost:8080/links
+*/
