@@ -6,7 +6,6 @@ import (
 	"log"
 	pq "manager/priority_queue"
 	"net/http"
-	"strings"
 	"sync"
 
 	"github.com/gorilla/mux"
@@ -25,28 +24,10 @@ func NewTaskManager() *TaskManager {
 	}
 }
 
-func Selector() {
-
-}
-
-func Router(bpq []*pq.PriorityQueue) {
-
-}
-
-func Prioritize(links []string) []*pq.PriorityQueue {
-	var bpq []*pq.PriorityQueue
-	for i, link := range links {
-		splLink := strings.Split(link, "/")
-		priority := len(splLink)
-		bpq[i].Push(pq.Item{Value: link, Priority: priority})
-	}
-	return bpq
-}
-
 func (tm *TaskManager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case "GET":
-		tm.handleGetLinks(w, r)
+		tm.handleGetLinks(w)
 	case "POST":
 		tm.handlePostLinks(w, r)
 	default:
@@ -54,7 +35,7 @@ func (tm *TaskManager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (tm *TaskManager) handleGetLinks(w http.ResponseWriter, r *http.Request) {
+func (tm *TaskManager) handleGetLinks(w http.ResponseWriter) {
 	tm.Lock()
 	defer tm.Unlock()
 
@@ -112,6 +93,22 @@ func (tm *TaskManager) handlePostLinks(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusCreated)
 }
+
+// -----------------------------------------------------------
+
+func Selector() {
+
+}
+
+func Router(bpq []*pq.PriorityQueue) {
+
+}
+
+func Prioritize(links []string) {
+
+}
+
+// -----------------------------------------------------------
 
 func main() {
 	taskManager := NewTaskManager()

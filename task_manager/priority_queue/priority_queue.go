@@ -12,18 +12,18 @@ type Item struct {
 
 type PriorityQueue struct {
 	sync.Mutex
-	queue []Item
+	queue []*Item
 }
 
 func NewPriorityQueue() *PriorityQueue {
-	return &PriorityQueue{queue: make([]Item, 0)}
+	return &PriorityQueue{queue: make([]*Item, 0)}
 }
 
 func (pq *PriorityQueue) Push(link Item) {
 	pq.Lock()
 	defer pq.Unlock()
 
-	pq.queue = append(pq.queue, link)
+	pq.queue = append(pq.queue, &link)
 }
 
 func (pq *PriorityQueue) Pop() Item {
@@ -36,7 +36,7 @@ func (pq *PriorityQueue) Pop() Item {
 
 	link := pq.queue[0]
 	pq.queue = pq.queue[1:]
-	return link
+	return *link
 }
 
 func (pq *PriorityQueue) IsEmpty() bool {
@@ -57,5 +57,5 @@ func (pq *PriorityQueue) Clear() {
 	pq.Lock()
 	defer pq.Unlock()
 
-	pq.queue = make([]Item, 0)
+	pq.queue = make([]*Item, 0)
 }
