@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"strconv"
 
 	"github.com/elastic/go-elasticsearch/esapi"
@@ -50,7 +51,12 @@ func IndexData(title, pageText, link string, es *elasticsearch.Client) {
 		fmt.Println("Error indexing document:", err)
 		return
 	}
-	defer res.Body.Close()
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			return
+		}
+	}(res.Body)
 
 	if res.IsError() {
 		fmt.Println("Failed to index document:", res.Status())

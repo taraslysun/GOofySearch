@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"math/rand"
 	"net/http"
 	"strings"
@@ -17,11 +18,8 @@ func LinkToChannel(link string, crawledLinksChannel chan string) {
 	crawledLinksChannel <- link
 }
 
-// ends crawling if there is no links to scrape
-// escpecially needed when working without taskmanager
-func MonitorCrawling(pendingLinksChannel chan string, crawedLinksChannel chan string,
-	linksAmountChannel chan int) {
-
+// MonitorCrawling ends crawling if there is no links to scrape especially needed when working without task manager
+func MonitorCrawling(pendingLinksChannel chan string, crawledLinksChannel chan string, linksAmountChannel chan int) {
 	i := 0
 	for j := range linksAmountChannel {
 		i += j
@@ -30,20 +28,19 @@ func MonitorCrawling(pendingLinksChannel chan string, crawedLinksChannel chan st
 		// if yes, close all the channels
 		if i == 0 {
 			close(pendingLinksChannel)
-			close(crawedLinksChannel)
+			close(crawledLinksChannel)
 			close(linksAmountChannel)
 		}
 	}
 }
 
-// used for filtering visited links
-func ProcessCrawledLinks(pendingLinksChannel chan string,
-	crawedLinksChannel chan string, linksAmountChannel chan int) {
+// ProcessCrawledLinks used for filtering visited links
+func ProcessCrawledLinks(pendingLinksChannel chan string, crawledLinksChannel chan string, linksAmountChannel chan int) {
 	foundUrls := make(map[string]bool)
 
 	// iterating over crawled links
 	// check if visited ? skip : add to pending links
-	for cl := range crawedLinksChannel {
+	for cl := range crawledLinksChannel {
 		if !foundUrls[cl] {
 			foundUrls[cl] = true
 			linksAmountChannel <- 1
@@ -89,9 +86,7 @@ func extractLink(token *html.Token, link *string) (string, bool) {
 
 		}
 	}
-
 	return "", false
-
 }
 
 func RandomString(userAgentList []string) string {
@@ -111,17 +106,18 @@ func extractContent(link *string, crawledLinksChannel chan string, es *elasticse
 
 	response := getResponse(link, RandomString(userAgentList))
 
-	defer response.Body.Close()
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+		}
+	}(response.Body)
 
 	z := html.NewTokenizer(response.Body)
 
 	for {
 		tokenType := z.Next()
-
 		switch tokenType {
-
 		case html.StartTagToken, html.SelfClosingTagToken:
-
 			token := z.Token()
 
 			switch token.Data {
@@ -147,14 +143,16 @@ func extractContent(link *string, crawledLinksChannel chan string, es *elasticse
 				tokenType = z.Next()
 				if tokenType == html.TextToken {
 					pageText += z.Token().Data
-
 				}
+
 			case "a":
 				href, ok := extractLink(&token, link)
 				if ok {
 					go LinkToChannel(href, crawledLinksChannel)
 				}
 			}
+		default:
+			panic("unhandled default case")
 
 		}
 
@@ -166,7 +164,6 @@ func extractContent(link *string, crawledLinksChannel chan string, es *elasticse
 		fmt.Println(*link)
 		IndexData(title, pageText, *link, es)
 	}
-
 }
 
 func CrawlWebpage(wg *sync.WaitGroup, pendingLinksChannel chan string,
@@ -180,9 +177,7 @@ func CrawlWebpage(wg *sync.WaitGroup, pendingLinksChannel chan string,
 			break
 		}
 	}
-
 	wg.Done()
-
 }
 
 func CrawlerMain(startLinks []string, depth int, numThreads int, es *elasticsearch.Client) {
@@ -211,23 +206,24 @@ func CrawlerMain(startLinks []string, depth int, numThreads int, es *elasticsear
 
 }
 
-// func ManageCrawler() {
-// for {
-// get request to task manager to get links
+func ManageCrawler() {
+	/*
+		for {
+		get request to task manager to get links
 
-// give to crawler 15-20 links with desired depth
-// CrawlerMain(link_from_task_manager, desired_depth, number_of_threads)
-// if depth is > 1, number_of_threads has to be greater than number of links (desirable)
+		give to crawler 15-20 links with desired depth
+		CrawlerMain(link_from_task_manager, desired_depth, number_of_threads)
+		if depth is > 1, number_of_threads has to be greater than number of links (desirable)
 
-// check some condition to end cycle
-// }
-// }
+		check some condition to end cycle
+		}
+	*/
+}
 
-// Run crawler without taskmanager
-
-// func main() {
-// 	es := Setup()
-// 	fmt.Println("Crawl started!...")
-// 	links := []string{"https://en.wikipedia.org/wiki/Nelson-class_battleship"}
-// 	CrawlerMain(links, 2, 15, es)
-// }
+// Run crawler without task manager
+func main() {
+	es := Setup()
+	fmt.Println("Crawl started!...")
+	links := []string{"https://en.wikipedia.org/wiki/Nelson-class_battleship"}
+	CrawlerMain(links, 2, 15, es)
+}

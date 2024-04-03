@@ -1,4 +1,5 @@
 package priority_queue
+
 import (
 	"sync"
 )
@@ -13,7 +14,6 @@ func NewPriorityQueue() *PriorityQueue {
 		queue: make([]string, 0),
 	}
 }
-
 
 func (pq *PriorityQueue) Push(link string) {
 	pq.Lock()
@@ -35,7 +35,6 @@ func (pq *PriorityQueue) Pop() string {
 	return link
 }
 
-
 func (pq *PriorityQueue) IsEmpty() bool {
 	pq.Lock()
 	defer pq.Unlock()
@@ -56,4 +55,3 @@ func (pq *PriorityQueue) Clear() {
 
 	pq.queue = make([]string, 0)
 }
-

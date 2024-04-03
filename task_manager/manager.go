@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	priority_queue "manager/priority_queue"
+	"manager/priority_queue"
 	"net/http"
 	"sync"
 
@@ -87,7 +87,7 @@ func (tm *TaskManager) handlePostLinks(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	
+
 	w.WriteHeader(http.StatusCreated)
 }
 
@@ -101,8 +101,7 @@ func main() {
 	log.Fatal(http.ListenAndServe(":8080", r))
 }
 
-
-/* 
+/*
 to run the server, run the following command in the task_manager directory:
    	go run manager.go
 to test the server, run the following command:
