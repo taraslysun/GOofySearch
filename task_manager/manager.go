@@ -4,8 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"manager/priority_queue"
+	pq "manager/priority_queue"
 	"net/http"
+	"strings"
 	"sync"
 
 	"github.com/gorilla/mux"
@@ -13,15 +14,33 @@ import (
 
 type TaskManager struct {
 	sync.Mutex
-	PriorityQueue *priority_queue.PriorityQueue
+	PriorityQueue *pq.PriorityQueue
 	visitedLinks  map[string]bool
 }
 
 func NewTaskManager() *TaskManager {
 	return &TaskManager{
-		PriorityQueue: priority_queue.NewPriorityQueue(),
+		PriorityQueue: pq.NewPriorityQueue(),
 		visitedLinks:  make(map[string]bool),
 	}
+}
+
+func Selector() {
+
+}
+
+func Router(bpq []*pq.PriorityQueue) {
+
+}
+
+func Prioritize(links []string) []*pq.PriorityQueue {
+	var bpq []*pq.PriorityQueue
+	for i, link := range links {
+		splLink := strings.Split(link, "/")
+		priority := len(splLink)
+		bpq[i].Push(pq.Item{Value: link, Priority: priority})
+	}
+	return bpq
 }
 
 func (tm *TaskManager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -39,11 +58,11 @@ func (tm *TaskManager) handleGetLinks(w http.ResponseWriter, r *http.Request) {
 	tm.Lock()
 	defer tm.Unlock()
 
-	var links []string
+	var links []pq.Item
 	for i := 0; i < 10; i++ {
 		if tm.PriorityQueue.Size() > 0 {
 			link := tm.PriorityQueue.Pop()
-			tm.visitedLinks[link] = true
+			tm.visitedLinks[link.Value] = true
 			links = append(links, link)
 		} else {
 			break
@@ -65,14 +84,17 @@ func (tm *TaskManager) handleGetLinks(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	w.Write(response)
+	_, err = w.Write(response)
+	if err != nil {
+		return
+	}
 }
 
 func (tm *TaskManager) handlePostLinks(w http.ResponseWriter, r *http.Request) {
 	tm.Lock()
 	defer tm.Unlock()
 
-	var links []string
+	var links []pq.Item
 	err := json.NewDecoder(r.Body).Decode(&links)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -81,7 +103,7 @@ func (tm *TaskManager) handlePostLinks(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Println("links post:", links)
 	for _, link := range links {
-		if !tm.visitedLinks[link] {
+		if !tm.visitedLinks[link.Value] {
 			tm.PriorityQueue.Push(link)
 		}
 	}

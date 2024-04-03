@@ -4,30 +4,36 @@ import (
 	"sync"
 )
 
+type Item struct {
+	Value    string
+	Priority int
+	index    int
+}
+
 type PriorityQueue struct {
 	sync.Mutex
-	queue []string
+	queue []Item
 }
 
 func NewPriorityQueue() *PriorityQueue {
 	return &PriorityQueue{
-		queue: make([]string, 0),
+		queue: make([]Item, 0),
 	}
 }
 
-func (pq *PriorityQueue) Push(link string) {
+func (pq *PriorityQueue) Push(link Item) {
 	pq.Lock()
 	defer pq.Unlock()
 
 	pq.queue = append(pq.queue, link)
 }
 
-func (pq *PriorityQueue) Pop() string {
+func (pq *PriorityQueue) Pop() Item {
 	pq.Lock()
 	defer pq.Unlock()
 
 	if len(pq.queue) == 0 {
-		return ""
+		return Item{}
 	}
 
 	link := pq.queue[0]
@@ -53,5 +59,5 @@ func (pq *PriorityQueue) Clear() {
 	pq.Lock()
 	defer pq.Unlock()
 
-	pq.queue = make([]string, 0)
+	pq.queue = make([]Item, 0)
 }
