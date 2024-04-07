@@ -1,14 +1,17 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/go-redis/redis/v8"
+	"github.com/gorilla/mux"
 	"log"
 	pq "manager/priority_queue"
 	"net/http"
+	"net/url"
+	"strings"
 	"sync"
-
-	"github.com/gorilla/mux"
 )
 
 type TaskManager struct {
@@ -96,16 +99,61 @@ func (tm *TaskManager) handlePostLinks(w http.ResponseWriter, r *http.Request) {
 
 // -----------------------------------------------------------
 
-func Selector() {
-
+func Selector(bpqs []*pq.PriorityQueue, redisClient redis.Client, queueName string, ctx context.Context, N int) string {
+	link, err := redisClient.LPop(ctx, queueName).Result()
+	if err != nil {
+		log.Fatal(err)
+	}
+	if link != "" {
+		return link
+	}
+	link = bpqs[N].Pop().Value
+	return link
 }
 
-func Router(bpq []*pq.PriorityQueue) {
-
+func Router(fpqs []*pq.PriorityQueue, bpqs []*pq.PriorityQueue, redisClient redis.Client, queueName string, ctx context.Context) {
+	for len(fpqs) != 0 {
+		fpq := fpqs[len(fpqs)-1]
+		fpqs = fpqs[:len(fpqs)-1]
+		for !fpq.IsEmpty() {
+			link := fpq.Pop()
+			var pushed bool
+			for _, q := range bpqs {
+				if strings.Split(link.Value, "/")[2] == strings.Split(q.Queue[0].Value, "/")[2] {
+					q.Push(link)
+					pushed = true
+					break
+				}
+			}
+			if !pushed {
+				err := redisClient.LPush(ctx, queueName, link).Err()
+				if err != nil {
+					log.Fatal(err)
+				}
+			}
+		}
+	}
 }
 
-func Prioritize(links []string) {
+// Prioritize : VD -> Visited Domains, M -> amount of FQs
+func Prioritize(links []string, M int, VD map[string]int, fpqs []*pq.PriorityQueue) {
+	for _, link := range links {
+		depth := len(strings.Split(link, "/"))
+		domain, err := url.Parse(link)
+		if err != nil {
+			return
+		}
+		hostname := domain.Hostname()
+		timesVisited := VD[hostname]
+		priority := calcPriority(timesVisited, depth, M)
+		fpqs[priority].Push(pq.Item{Priority: priority, Value: link})
+		VD[hostname]++
+	}
+}
 
+func calcPriority(timesVisited int, depth int, M int) int {
+	priority := M - timesVisited*(1/2) + depth*(1/2)
+	return priority
 }
 
 // -----------------------------------------------------------
