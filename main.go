@@ -225,5 +225,5 @@ func main() {
 	es := Setup()
 	fmt.Println("Crawl started!...")
 	links := []string{"https://en.wikipedia.org/wiki/Nelson-class_battleship"}
-	CrawlerMain(links, 2, 15, es)
+	CrawlerMain(links, 2, 8, es)
 }

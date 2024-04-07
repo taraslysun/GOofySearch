@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"github.com/go-redis/redis/v8"
 	"github.com/gorilla/mux"
 	"log"
@@ -18,12 +17,23 @@ type TaskManager struct {
 	sync.Mutex
 	PriorityQueue *pq.PriorityQueue
 	visitedLinks  map[string]bool
+
+	fpqs         []*pq.PriorityQueue
+	bpqs         []*pq.PriorityQueue
+	timesVisited map[string]int
+	redisClient  redis.Client
+	ctx          context.Context
 }
 
-func NewTaskManager() *TaskManager {
+func NewTaskManager(N int, M int) *TaskManager {
 	return &TaskManager{
 		PriorityQueue: pq.NewPriorityQueue(),
 		visitedLinks:  make(map[string]bool),
+		fpqs:          make([]*pq.PriorityQueue, M),
+		bpqs:          make([]*pq.PriorityQueue, N),
+		timesVisited:  make(map[string]int),
+		redisClient:   *newRedisClient(),
+		ctx:           newCtx(),
 	}
 }
 
@@ -38,87 +48,67 @@ func (tm *TaskManager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// handleGetLinks sends links to crawler
 func (tm *TaskManager) handleGetLinks(w http.ResponseWriter) {
 	tm.Lock()
 	defer tm.Unlock()
 
-	var links []pq.Item
-	for i := 0; i < 10; i++ {
-		if tm.PriorityQueue.Size() > 0 {
-			link := tm.PriorityQueue.Pop()
-			tm.visitedLinks[link.Value] = true
-			links = append(links, link)
-		} else {
-			break
-		}
-	}
-
-	fmt.Println("links get:", links)
-
-	if links == nil {
-		http.Error(w, "No links available", http.StatusNoContent)
-		return
-	}
-
+	links := tm.Selector("tmpQ", 3)
 	response, err := json.Marshal(links)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	_, err = w.Write(response)
 	if err != nil {
-		return
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
 
+// handlePostLinks receives links from crawler
 func (tm *TaskManager) handlePostLinks(w http.ResponseWriter, r *http.Request) {
 	tm.Lock()
 	defer tm.Unlock()
 
-	var links []pq.Item
+	var links []string
 	err := json.NewDecoder(r.Body).Decode(&links)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
 	}
 
-	fmt.Println("links post:", links)
-	for _, link := range links {
-		if !tm.visitedLinks[link.Value] {
-			tm.PriorityQueue.Push(link)
-		}
-	}
+	tm.Prioritize(links)
+	tm.Router("tmpQ")
 
 	w.Header().Set("Content-Type", "application/json")
-
 	w.WriteHeader(http.StatusCreated)
 }
 
 // -----------------------------------------------------------
 
-func Selector(bpqs []*pq.PriorityQueue, redisClient redis.Client, queueName string, ctx context.Context, N int) string {
-	link, err := redisClient.LPop(ctx, queueName).Result()
+func (tm *TaskManager) Selector(queueName string, N int) string {
+	link, err := tm.redisClient.LPop(tm.ctx, queueName).Result()
 	if err != nil {
 		log.Fatal(err)
 	}
-	if link != "" {
-		return link
+	if link == "" {
+		return ""
 	}
-	link = bpqs[N].Pop().Value
+	link = tm.bpqs[N].Pop().Value
 	return link
 }
 
-func Router(fpqs []*pq.PriorityQueue, bpqs []*pq.PriorityQueue, redisClient redis.Client, queueName string, ctx context.Context) {
-	for len(fpqs) != 0 {
-		fpq := fpqs[len(fpqs)-1]
-		fpqs = fpqs[:len(fpqs)-1]
+func (tm *TaskManager) Router(queueName string) {
+	for len(tm.fpqs) != 0 {
+		fpq := tm.fpqs[len(tm.fpqs)-1]
+		tm.fpqs = tm.fpqs[:len(tm.fpqs)-1]
 		for !fpq.IsEmpty() {
 			link := fpq.Pop()
 			var pushed bool
-			for _, q := range bpqs {
+			for _, q := range tm.bpqs {
+				// since split url looks like this : ['https:', '', 'github.com', 'taraslysun', 'GOofySearch', 'tree', 'concurrent_crawler']
+				// we take 2nd element from split array
 				if strings.Split(link.Value, "/")[2] == strings.Split(q.Queue[0].Value, "/")[2] {
 					q.Push(link)
 					pushed = true
@@ -126,7 +116,7 @@ func Router(fpqs []*pq.PriorityQueue, bpqs []*pq.PriorityQueue, redisClient redi
 				}
 			}
 			if !pushed {
-				err := redisClient.LPush(ctx, queueName, link).Err()
+				err := tm.redisClient.LPush(tm.ctx, queueName, link).Err()
 				if err != nil {
 					log.Fatal(err)
 				}
@@ -136,18 +126,18 @@ func Router(fpqs []*pq.PriorityQueue, bpqs []*pq.PriorityQueue, redisClient redi
 }
 
 // Prioritize : VD -> Visited Domains, M -> amount of FQs
-func Prioritize(links []string, M int, VD map[string]int, fpqs []*pq.PriorityQueue) {
+func (tm *TaskManager) Prioritize(links []string) {
 	for _, link := range links {
 		depth := len(strings.Split(link, "/"))
 		domain, err := url.Parse(link)
 		if err != nil {
-			return
+			log.Fatal(err)
 		}
 		hostname := domain.Hostname()
-		timesVisited := VD[hostname]
-		priority := calcPriority(timesVisited, depth, M)
-		fpqs[priority].Push(pq.Item{Priority: priority, Value: link})
-		VD[hostname]++
+		timesVisited := tm.timesVisited[hostname]
+		priority := calcPriority(timesVisited, depth, len(tm.fpqs))
+		tm.fpqs[priority].Push(pq.Item{Priority: priority, Value: link})
+		tm.timesVisited[hostname]++
 	}
 }
 
@@ -159,7 +149,9 @@ func calcPriority(timesVisited int, depth int, M int) int {
 // -----------------------------------------------------------
 
 func main() {
-	taskManager := NewTaskManager()
+	N := 8
+	M := 10
+	taskManager := NewTaskManager(N, M)
 
 	r := mux.NewRouter()
 	r.Handle("/links", taskManager).Methods("GET", "POST")

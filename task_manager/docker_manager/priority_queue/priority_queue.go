@@ -5,9 +5,9 @@ import (
 )
 
 type Item struct {
-	Value    string
-	Priority int
-	index    int
+	Value    string `json:"value"`
+	Priority int    `json:"priority"`
+	Index    int    `json:"index"`
 }
 
 type PriorityQueue struct {

@@ -5,11 +5,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
-	"strconv"
-
 	"github.com/elastic/go-elasticsearch/esapi"
 	"github.com/elastic/go-elasticsearch/v7"
+	"io"
+	"strconv"
 )
 
 func Setup() *elasticsearch.Client {
