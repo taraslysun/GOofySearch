@@ -1,10 +1,14 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"math/rand"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -19,7 +23,7 @@ func LinkToChannel(link string, crawledLinksChannel chan string) {
 }
 
 // MonitorCrawling ends crawling if there is no links to scrape especially needed when working without task manager
-func MonitorCrawling(pendingLinksChannel chan string, crawledLinksChannel chan string, linksAmountChannel chan int) {
+func MonitorCrawling(crawledLinksChannel chan string, linksAmountChannel chan int) {
 	i := 0
 	for j := range linksAmountChannel {
 		i += j
@@ -27,7 +31,6 @@ func MonitorCrawling(pendingLinksChannel chan string, crawledLinksChannel chan s
 		// check if number of pending links is 0
 		// if yes, close all the channels
 		if i == 0 {
-			close(pendingLinksChannel)
 			close(crawledLinksChannel)
 			close(linksAmountChannel)
 		}
@@ -190,7 +193,7 @@ func CrawlerMain(startLinks []string, depth int, numThreads int, es *elasticsear
 	}
 
 	go ProcessCrawledLinks(pendingLinksChannel, crawledLinksChannel, linksAmountChannel)
-	go MonitorCrawling(pendingLinksChannel, crawledLinksChannel, linksAmountChannel)
+	go MonitorCrawling(crawledLinksChannel, linksAmountChannel)
 
 	var wg sync.WaitGroup
 
@@ -201,29 +204,58 @@ func CrawlerMain(startLinks []string, depth int, numThreads int, es *elasticsear
 
 	wg.Wait()
 
-	// post method to task manager to return new links
-	// need to return links from pendingLinksChannel
+	var links []string
+	for range pendingLinksChannel {
+		links = append(links, <-pendingLinksChannel)
+	}
 
+	jsonLinks, err := json.Marshal(links)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	client := &http.Client{}
+	req, err := http.NewRequest("POST", "localhost:8080", bytes.NewBuffer(jsonLinks))
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := client.Do(req)
+
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+
+		}
+	}(resp.Body)
+
+	close(pendingLinksChannel)
 }
 
-func ManageCrawler() {
-	/*
-		for {
-		get request to task manager to get links
-
-		give to crawler 15-20 links with desired depth
-		CrawlerMain(link_from_task_manager, desired_depth, number_of_threads)
-		if depth is > 1, number_of_threads has to be greater than number of links (desirable)
-
-		check some condition to end cycle
+func ManageCrawler(numThreads int, depth int, manager string, es *elasticsearch.Client) {
+	client := &http.Client{}
+	for i := 0; i < numThreads; i++ {
+		res, err := http.NewRequest("GET", manager, nil)
+		if err != nil {
+			log.Fatal(err)
 		}
-	*/
+		q := res.URL.Query()
+		q.Add("CID", strconv.Itoa(i))
+		res.URL.RawQuery = q.Encode()
+
+		resp, err := client.Do(res)
+		if err != nil {
+			log.Fatal(err)
+		}
+		_, err = io.ReadAll(resp.Body) // got links
+		links := []string{""}
+		CrawlerMain(links, depth, len(links), es)
+	}
 }
 
 // Run crawler without task manager
 func main() {
 	es := Setup()
 	fmt.Println("Crawl started!...")
-	links := []string{"https://en.wikipedia.org/wiki/Nelson-class_battleship"}
-	CrawlerMain(links, 2, 8, es)
+	for {
+		ManageCrawler(5, 2, "localhost:80", es)
+	}
 }
