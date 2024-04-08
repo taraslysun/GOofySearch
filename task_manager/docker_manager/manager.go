@@ -3,20 +3,20 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"github.com/go-redis/redis/v8"
-	"github.com/gorilla/mux"
 	"log"
 	pq "manager/priority_queue"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/go-redis/redis/v8"
+	"github.com/gorilla/mux"
 )
 
 type TaskManager struct {
 	sync.Mutex
-	PriorityQueue *pq.PriorityQueue
-	visitedLinks  map[string]bool
 
 	fpqs         []*pq.PriorityQueue
 	bpqs         []*pq.PriorityQueue
@@ -27,13 +27,11 @@ type TaskManager struct {
 
 func NewTaskManager(N int, M int) *TaskManager {
 	return &TaskManager{
-		PriorityQueue: pq.NewPriorityQueue(),
-		visitedLinks:  make(map[string]bool),
-		fpqs:          make([]*pq.PriorityQueue, M),
-		bpqs:          make([]*pq.PriorityQueue, N),
-		timesVisited:  make(map[string]int),
-		redisClient:   *newRedisClient(),
-		ctx:           newCtx(),
+		fpqs:         make([]*pq.PriorityQueue, M),
+		bpqs:         make([]*pq.PriorityQueue, N),
+		timesVisited: make(map[string]int),
+		redisClient:  *newRedisClient(),
+		ctx:          newCtx(),
 	}
 }
 
@@ -53,8 +51,10 @@ func (tm *TaskManager) handleGetLinks(w http.ResponseWriter, r *http.Request) {
 	tm.Lock()
 	defer tm.Unlock()
 
-	vars := mux.Vars(r)
-	crawlerId, err := strconv.Atoi(vars["CID"])
+	query := r.URL.Query()
+	crawlerIdStr := query.Get("CID")
+
+	crawlerId, err := strconv.Atoi(crawlerIdStr)
 	if err != nil {
 		http.Error(w, "Cannot convert id to int", http.StatusBadRequest)
 	}
@@ -94,10 +94,8 @@ func (tm *TaskManager) handlePostLinks(w http.ResponseWriter, r *http.Request) {
 // -----------------------------------------------------------
 
 func (tm *TaskManager) Selector(queueName string, N int) string {
-	link, err := tm.redisClient.LPop(tm.ctx, queueName).Result()
-	if err != nil {
-		log.Fatal(err)
-	}
+	link, _ := tm.redisClient.LPop(tm.ctx, queueName).Result()
+
 	if link == "" {
 		return ""
 	}
