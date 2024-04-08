@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	pq "manager/priority_queue"
 	"net/http"
@@ -26,9 +27,20 @@ type TaskManager struct {
 }
 
 func NewTaskManager(N int, M int) *TaskManager {
+
+	var fpqs []*pq.PriorityQueue
+	var bpqs []*pq.PriorityQueue
+
+	for i := 0; i < M; i++ {
+		fpqs = append(fpqs, pq.NewPriorityQueue())
+	}
+	for i := 0; i < N; i++ {
+		bpqs = append(bpqs, pq.NewPriorityQueue())
+	}
+
 	return &TaskManager{
-		fpqs:         make([]*pq.PriorityQueue, M),
-		bpqs:         make([]*pq.PriorityQueue, N),
+		fpqs:         fpqs,
+		bpqs:         fpqs,
 		timesVisited: make(map[string]int),
 		redisClient:  *newRedisClient(),
 		ctx:          newCtx(),
@@ -97,30 +109,39 @@ func (tm *TaskManager) Selector(queueName string, N int) string {
 	link, _ := tm.redisClient.LPop(tm.ctx, queueName).Result()
 
 	if link == "" {
-		return ""
+		link = tm.bpqs[N].Pop().(*pq.Item).Value
 	}
-	link = tm.bpqs[N].Pop().Value
 	return link
 }
 
 func (tm *TaskManager) Router(queueName string) {
-	for len(tm.fpqs) != 0 {
-		fpq := tm.fpqs[len(tm.fpqs)-1]
-		tm.fpqs = tm.fpqs[:len(tm.fpqs)-1]
-		for !fpq.IsEmpty() {
-			link := fpq.Pop()
+	flen := len(tm.fpqs)
+	for i := 0; i < flen; i++ {
+		fmt.Println("fpqs len: ", len(tm.fpqs))
+		fpq := tm.fpqs[i]
+		sfpq := fpq.Len()
+		for k := 0; k < sfpq; k++ {
+			link := fpq.Pop().(*pq.Item)
 			var pushed bool
+			fmt.Println("AAAA", link.Value)
 			for _, q := range tm.bpqs {
 				// since split url looks like this : ['https:', '', 'github.com', 'taraslysun', 'GOofySearch', 'tree', 'concurrent_crawler']
 				// we take 2nd element from split array
-				if strings.Split(link.Value, "/")[2] == strings.Split(q.Queue[0].Value, "/")[2] {
+				if (*q).Len() == 0 {
 					q.Push(link)
+					fmt.Println(link.Value)
+					pushed = true
+					break
+				}
+				if strings.Split(link.Value, "/")[2] == strings.Split((*q)[0].Value, "/")[2] {
+					q.Push(link)
+					fmt.Println("Pushed")
 					pushed = true
 					break
 				}
 			}
 			if !pushed {
-				err := tm.redisClient.LPush(tm.ctx, queueName, link).Err()
+				err := tm.redisClient.LPush(tm.ctx, queueName, link.Value).Err()
 				if err != nil {
 					log.Fatal(err)
 				}
@@ -140,7 +161,7 @@ func (tm *TaskManager) Prioritize(links []string) {
 		hostname := domain.Hostname()
 		timesVisited := tm.timesVisited[hostname]
 		priority := calcPriority(timesVisited, depth, len(tm.fpqs))
-		tm.fpqs[priority].Push(pq.Item{Priority: priority, Value: link})
+		tm.fpqs[priority-1].Push(&pq.Item{Priority: priority, Value: link})
 		tm.timesVisited[hostname]++
 	}
 }

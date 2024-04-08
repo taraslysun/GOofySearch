@@ -8,7 +8,6 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
-	"strconv"
 	"strings"
 	"sync"
 
@@ -165,7 +164,7 @@ func extractContent(link *string, crawledLinksChannel chan string, es *elasticse
 	}
 	if title != "" && pageText != "" {
 		fmt.Println(*link)
-		IndexData(title, pageText, *link, es)
+		//IndexData(title, pageText, *link, es)
 	}
 }
 
@@ -215,7 +214,7 @@ func CrawlerMain(startLinks []string, depth int, numThreads int, es *elasticsear
 	}
 
 	client := &http.Client{}
-	req, err := http.NewRequest("POST", "localhost:8080", bytes.NewBuffer(jsonLinks))
+	req, err := http.NewRequest("POST", "http://localhost:8080", bytes.NewBuffer(jsonLinks))
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := client.Do(req)
@@ -238,16 +237,23 @@ func ManageCrawler(numThreads int, depth int, manager string, es *elasticsearch.
 			log.Fatal(err)
 		}
 		q := res.URL.Query()
-		q.Add("CID", strconv.Itoa(i))
+		q.Add("CID", "1")
 		res.URL.RawQuery = q.Encode()
+		fmt.Println("res", res.URL)
 
 		resp, err := client.Do(res)
 		if err != nil {
 			log.Fatal(err)
 		}
-		_, err = io.ReadAll(resp.Body) // got links
-		links := []string{""}
-		CrawlerMain(links, depth, len(links), es)
+		body, err := io.ReadAll(resp.Body)
+		fmt.Println("B:", string(body))
+		if err != nil {
+			log.Fatal(err)
+		}
+		var stringBodya []string
+		err = json.Unmarshal(body, &stringBodya)
+		fmt.Println("Bodya", stringBodya)
+		CrawlerMain(stringBodya, depth, len(stringBodya), es)
 	}
 }
 
@@ -256,6 +262,7 @@ func main() {
 	es := Setup()
 	fmt.Println("Crawl started!...")
 	for {
-		ManageCrawler(5, 2, "localhost:80", es)
+		ManageCrawler(5, 2, "http://localhost:8080/links", es)
 	}
+
 }
