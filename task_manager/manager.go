@@ -105,13 +105,20 @@ func (tm *TaskManager) handlePostLinks(w http.ResponseWriter, r *http.Request) {
 
 // -----------------------------------------------------------
 
-func (tm *TaskManager) Selector(queueName string, N int) string {
+func (tm *TaskManager) Selector(queueName string, N int) []string {
 	link, _ := tm.redisClient.LPop(tm.ctx, queueName).Result()
+	links := []string{}
 
 	if link == "" {
-		link = tm.bpqs[N].Pop().(*pq.Item).Value
+		for i := 0; i < 15; i++ {
+			if tm.bpqs[N].Len() == 0 {
+				break
+			}
+			link = tm.bpqs[N].Pop().(*pq.Item).Value
+			links = append(links, link)
+		}
 	}
-	return link
+	return links
 }
 
 func (tm *TaskManager) Router(queueName string) {
@@ -174,7 +181,7 @@ func calcPriority(timesVisited int, depth int, M int) int {
 // -----------------------------------------------------------
 
 func main() {
-	N := 8
+	N := 5
 	M := 10
 	taskManager := NewTaskManager(N, M)
 
