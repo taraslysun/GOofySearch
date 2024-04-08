@@ -40,7 +40,7 @@ func NewTaskManager(N int, M int) *TaskManager {
 func (tm *TaskManager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case "GET":
-		tm.handleGetLinks(w)
+		tm.handleGetLinks(w, r)
 	case "POST":
 		tm.handlePostLinks(w, r)
 	default:
@@ -49,11 +49,17 @@ func (tm *TaskManager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleGetLinks sends links to crawler
-func (tm *TaskManager) handleGetLinks(w http.ResponseWriter) {
+func (tm *TaskManager) handleGetLinks(w http.ResponseWriter, r *http.Request) {
 	tm.Lock()
 	defer tm.Unlock()
 
-	links := tm.Selector("tmpQ", 3)
+	vars := mux.Vars(r)
+	crawlerId, err := strconv.Atoi(vars["CID"])
+	if err != nil {
+		http.Error(w, "Cannot convert id to int", http.StatusBadRequest)
+	}
+
+	links := tm.Selector("tmpQ", crawlerId)
 	response, err := json.Marshal(links)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
