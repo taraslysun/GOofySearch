@@ -64,7 +64,7 @@ func getResponse(link *string, agent string) *http.Response {
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		fmt.Println("Error while connecting to site.")
+		return nil
 	}
 	return resp
 }
@@ -110,6 +110,10 @@ func extractContent(link *string, wgLinks *sync.WaitGroup, crawledLinksChannel c
 	var pageText string
 
 	response := getResponse(link, RandomString(userAgentList))
+
+	if response == nil {
+		return
+	}
 
 	defer func(Body io.ReadCloser) {
 		err := Body.Close()
@@ -164,7 +168,7 @@ func extractContent(link *string, wgLinks *sync.WaitGroup, crawledLinksChannel c
 		}
 	}
 	if title != "" && pageText != "" {
-		fmt.Println("Content link", *link)
+		// fmt.Println("Content link", *link)
 		// IndexData(title, pageText, *link, es)
 	}
 }
@@ -175,7 +179,6 @@ func CrawlWebpage(wg *sync.WaitGroup, pendingLinksChannel chan string,
 	var wgLinks sync.WaitGroup
 
 	link := <-pendingLinksChannel
-	fmt.Println("cw ", link)
 	extractContent(&link, &wgLinks, crawledLinksChannel, es, linksAmountChannel)
 	wgLinks.Wait()
 	linksAmountChannel <- -1
@@ -183,7 +186,7 @@ func CrawlWebpage(wg *sync.WaitGroup, pendingLinksChannel chan string,
 	wg.Done()
 }
 
-func CrawlerMain(startLinks []string, numLinks int, es *elasticsearch.Client) {
+func CrawlerMain(startLinks []string, numLinks int, es *elasticsearch.Client, mu *sync.Mutex) {
 	pendingLinksChannel := make(chan string)
 	crawledLinksChannel := make(chan string, 1000000)
 	linksAmountChannel := make(chan int)
@@ -229,6 +232,7 @@ func CrawlerMain(startLinks []string, numLinks int, es *elasticsearch.Client) {
 	req, err := http.NewRequest("POST", "http://localhost:8080/links", bytes.NewBuffer(jsonLinks))
 	req.Header.Set("Content-Type", "application/json")
 
+	mu.Lock()
 	resp, err := client.Do(req)
 
 	defer func(Body io.ReadCloser) {
@@ -236,48 +240,76 @@ func CrawlerMain(startLinks []string, numLinks int, es *elasticsearch.Client) {
 		if err != nil {
 		}
 	}(resp.Body)
+	mu.Unlock()
 }
 
 // ManageCrawler basically handles GET Request
-func ManageCrawler(numThreads int, linksPerRoutine int, manager string, es *elasticsearch.Client) {
+func ManageCrawler(numThreads int, manager string, es *elasticsearch.Client) {
 	client := &http.Client{}
-	for i := 1; i < numThreads+1; i++ {
-		res, err := http.NewRequest("GET", manager, nil)
-		if err != nil {
-			log.Fatal(err)
-		}
-		q := res.URL.Query()
-		CID := strconv.Itoa(i)
-		q.Add("CID", CID)
-		res.URL.RawQuery = q.Encode()
+	var wg sync.WaitGroup
+	var mu sync.Mutex
 
-		fmt.Println(res.URL)
-		resp, err := client.Do(res)
-		if err != nil {
-			log.Fatal(err)
-		}
-		body, err := io.ReadAll(resp.Body)
-		if err != nil {
-			log.Fatal(err)
-		}
-		var links []string
-		err = json.Unmarshal(body, &links)
-		fmt.Println("Links: ", links)
-		CrawlerMain(links, len(links), es)
-		fmt.Println("")
+	for i := 1; i <= numThreads; i++ {
+		wg.Add(1) // Increment WaitGroup counter for each goroutine
+
+		go func(id int) {
+			defer wg.Done() // Decrement WaitGroup counter when the goroutine exits
+
+			res, err := http.NewRequest("GET", manager, nil)
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			q := res.URL.Query()
+			q.Add("CID", strconv.Itoa(id))
+			res.URL.RawQuery = q.Encode()
+
+			fmt.Println(res.URL)
+
+			resp, err := client.Do(res)
+			if err != nil {
+				log.Fatal(err)
+			}
+			defer func(Body io.ReadCloser) {
+				err := Body.Close()
+				if err != nil {
+
+				}
+			}(resp.Body) // Close the response body
+
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			var links []string
+			err = json.Unmarshal(body, &links)
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			fmt.Println("Links: ", links)
+			CrawlerMain(links, len(links), es, &mu)
+			fmt.Println("")
+		}(i)
 	}
+
+	wg.Wait() // Wait for all goroutines to finish
 }
 
 func main() {
 	es := Setup()
 	i := 0
 	fmt.Println("Crawl started!...")
-	for i != 1 {
-		ManageCrawler(5, 5, "http://localhost:8080/links", es)
+	// var mu sync.Mutex
+
+	for i != 10 {
+		ManageCrawler(5, "http://localhost:8080/links", es)
 		fmt.Println("it: ", i)
 		i++
 	}
-	// links := []string{"https://www.amazon.com/"}
-	// CrawlerMain(links, len(links), es)
+	// links := []string{"https://www.amazon.com/", "https://en.wikipedia.org/wiki/Nelson-class_battleship",
+	//   "https://en.wikipedia.org/wiki/Armstrong_Whitworth"}
+	// CrawlerMain(links, len(links), es, &mu)
 
 }

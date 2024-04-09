@@ -14,8 +14,8 @@ func NewPriorityQueue() *PriorityQueue {
 	return &PriorityQueue{}
 }
 
-func (pq *PriorityQueue) isEmpty() bool {
-	return len(*pq) == 0
+func (pq PriorityQueue) isEmpty() bool {
+	return len(pq) == 0
 }
 
 func (pq PriorityQueue) Len() int {

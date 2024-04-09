@@ -109,38 +109,43 @@ func (tm *TaskManager) handlePostLinks(w http.ResponseWriter, r *http.Request) {
 
 // -----------------------------------------------------------
 
-func (tm *TaskManager) checkRedis() []pq.Item {
-	links, err := tm.redisClient.ZPopMax(tm.ctx, tm.redisQueue).Result()
-	var redisLinks []pq.Item
+func (tm *TaskManager) checkRedis(N int) {
+
+	newLink, err := tm.redisClient.ZPopMax(tm.ctx, tm.redisQueue).Result()
 
 	if errors.Is(err, redis.Nil) {
-		return nil
 	}
 
-	if len(links) == 0 {
-		return []pq.Item{}
+	tm.bpqs[N].Push(&pq.Item{
+		Priority: int(newLink[0].Score),
+		Value:    newLink[0].Member.(string),
+	})
+
+	res, err := tm.redisClient.ZRange(tm.ctx, tm.redisQueue, 0, -1).Result()
+
+	if errors.Is(err, redis.Nil) {
+		log.Fatal(err)
 	}
 
-	for _, link := range links {
-		redisLinks = append(redisLinks, pq.Item{
-			Priority: int(link.Score),
-			Value:    link.Member.(string),
-		})
+	for _, link := range res {
+		if strings.Split(link, "/")[2] == strings.Split(newLink[0].Member.(string), "/")[2] {
+			linkToPush, err := tm.redisClient.ZRem(tm.ctx, tm.redisQueue, link).Result()
+			if err != nil {
+				log.Fatal(err)
+			}
+			tm.bpqs[N].Push(&pq.Item{Value: link, Priority: int(linkToPush)})
+		}
 	}
-	return redisLinks
-
 }
 
 func (tm *TaskManager) Selector(N int) []string {
 	var links []string
 
-	if tm.bpqs[N].Len() == 0 {
-		redisLink := tm.checkRedis()[0]
-		fmt.Println(redisLink.Value)
-		tm.bpqs[N].Push(&redisLink)
+	for tm.bpqs[N].Len() != 0 {
+		links = append(links, tm.bpqs[N].Pop().(*pq.Item).Value)
 	}
-	link := tm.bpqs[N].Pop().(*pq.Item).Value
-	links = append(links, link)
+
+	tm.checkRedis(N)
 
 	return links
 }
