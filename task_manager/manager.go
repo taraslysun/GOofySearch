@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	pq "manager/priority_queue"
@@ -24,6 +25,7 @@ type TaskManager struct {
 	timesVisited map[string]int
 	redisClient  redis.Client
 	ctx          context.Context
+	redisQueue   string
 }
 
 func NewTaskManager(N int, M int) *TaskManager {
@@ -44,6 +46,7 @@ func NewTaskManager(N int, M int) *TaskManager {
 		timesVisited: make(map[string]int),
 		redisClient:  *newRedisClient(),
 		ctx:          newCtx(),
+		redisQueue:   "redisQueue",
 	}
 }
 
@@ -71,7 +74,7 @@ func (tm *TaskManager) handleGetLinks(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Cannot convert id to int", http.StatusBadRequest)
 	}
 
-	links := tm.Selector("tmpQ", crawlerId)
+	links := tm.Selector(crawlerId)
 	response, err := json.Marshal(links)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -96,8 +99,9 @@ func (tm *TaskManager) handlePostLinks(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	}
 
+	fmt.Println("POST Links", links)
 	tm.Prioritize(links)
-	tm.Router("tmpQ")
+	tm.Router()
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
@@ -105,50 +109,68 @@ func (tm *TaskManager) handlePostLinks(w http.ResponseWriter, r *http.Request) {
 
 // -----------------------------------------------------------
 
-func (tm *TaskManager) Selector(queueName string, N int) []string {
-	link, _ := tm.redisClient.LPop(tm.ctx, queueName).Result()
-	links := []string{}
+func (tm *TaskManager) checkRedis() []pq.Item {
+	links, err := tm.redisClient.ZPopMax(tm.ctx, tm.redisQueue).Result()
+	var redisLinks []pq.Item
 
-	if link == "" {
-		for i := 0; i < 15; i++ {
-			if tm.bpqs[N].Len() == 0 {
-				break
-			}
-			link = tm.bpqs[N].Pop().(*pq.Item).Value
-			links = append(links, link)
-		}
+	if errors.Is(err, redis.Nil) {
+		return nil
 	}
+
+	if len(links) == 0 {
+		return []pq.Item{}
+	}
+
+	for _, link := range links {
+		redisLinks = append(redisLinks, pq.Item{
+			Priority: int(link.Score),
+			Value:    link.Member.(string),
+		})
+	}
+	return redisLinks
+
+}
+
+func (tm *TaskManager) Selector(N int) []string {
+	var links []string
+
+	if tm.bpqs[N].Len() == 0 {
+		redisLink := tm.checkRedis()[0]
+		fmt.Println(redisLink.Value)
+		tm.bpqs[N].Push(&redisLink)
+	}
+	link := tm.bpqs[N].Pop().(*pq.Item).Value
+	links = append(links, link)
+
 	return links
 }
 
-func (tm *TaskManager) Router(queueName string) {
-	flen := len(tm.fpqs)
-	for i := 0; i < flen; i++ {
-		fmt.Println("fpqs len: ", len(tm.fpqs))
+func (tm *TaskManager) Router() {
+	fpqsLen := len(tm.fpqs)
+	for i := 0; i < fpqsLen; i++ {
 		fpq := tm.fpqs[i]
-		sfpq := fpq.Len()
-		for k := 0; k < sfpq; k++ {
+		fpqLen := fpq.Len()
+		for k := 0; k < fpqLen; k++ {
 			link := fpq.Pop().(*pq.Item)
 			var pushed bool
-			fmt.Println("AAAA", link.Value)
 			for _, q := range tm.bpqs {
 				// since split url looks like this : ['https:', '', 'github.com', 'taraslysun', 'GOofySearch', 'tree', 'concurrent_crawler']
 				// we take 2nd element from split array
 				if (*q).Len() == 0 {
 					q.Push(link)
-					fmt.Println(link.Value)
 					pushed = true
 					break
-				}
-				if strings.Split(link.Value, "/")[2] == strings.Split((*q)[0].Value, "/")[2] {
+				} else if strings.Split(link.Value, "/")[2] == strings.Split((*q)[0].Value, "/")[2] {
 					q.Push(link)
-					fmt.Println("Pushed")
 					pushed = true
 					break
 				}
 			}
 			if !pushed {
-				err := tm.redisClient.LPush(tm.ctx, queueName, link.Value).Err()
+				err := tm.redisClient.ZAdd(tm.ctx, tm.redisQueue, &redis.Z{
+					Score:  float64(link.Priority),
+					Member: link.Value,
+				}).Err()
 				if err != nil {
 					log.Fatal(err)
 				}
@@ -168,7 +190,10 @@ func (tm *TaskManager) Prioritize(links []string) {
 		hostname := domain.Hostname()
 		timesVisited := tm.timesVisited[hostname]
 		priority := calcPriority(timesVisited, depth, len(tm.fpqs))
-		tm.fpqs[priority-1].Push(&pq.Item{Priority: priority, Value: link})
+		tm.fpqs[priority-1].Push(&pq.Item{
+			Priority: priority,
+			Value:    link},
+		)
 		tm.timesVisited[hostname]++
 	}
 }

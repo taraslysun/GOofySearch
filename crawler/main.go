@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -31,7 +32,6 @@ func MonitorCrawling(pendingLinksChannel, crawledLinksChannel chan string, links
 		// if yes, close all the channels
 		if i == 0 {
 			close(pendingLinksChannel)
-
 			close(crawledLinksChannel)
 			close(linksAmountChannel)
 		}
@@ -155,7 +155,6 @@ func extractContent(link *string, crawledLinksChannel chan string, es *elasticse
 					go LinkToChannel(href, crawledLinksChannel)
 				}
 			}
-
 		}
 
 		if tokenType == html.ErrorToken {
@@ -163,8 +162,8 @@ func extractContent(link *string, crawledLinksChannel chan string, es *elasticse
 		}
 	}
 	if title != "" && pageText != "" {
-		fmt.Println(*link)
-		//IndexData(title, pageText, *link, es)
+		fmt.Println("Content link", *link)
+		// IndexData(title, pageText, *link, es)
 	}
 }
 
@@ -183,7 +182,7 @@ func CrawlWebpage(wg *sync.WaitGroup, pendingLinksChannel chan string,
 }
 
 func CrawlerMain(startLinks []string, depth int, numThreads int, es *elasticsearch.Client) {
-	pendingLinksChannel := make(chan string)
+	pendingLinksChannel := make(chan string, 2)
 	crawledLinksChannel := make(chan string)
 	linksAmountChannel := make(chan int)
 
@@ -200,38 +199,38 @@ func CrawlerMain(startLinks []string, depth int, numThreads int, es *elasticsear
 		wg.Add(1)
 		go CrawlWebpage(&wg, pendingLinksChannel, crawledLinksChannel, linksAmountChannel, depth, es)
 	}
-
 	wg.Wait()
 
-	// var links []string
-	// for range pendingLinksChannel {
-	// 	links = append(links, <-pendingLinksChannel)
-	// }
+	// POST Request part
 
-	// jsonLinks, err := json.Marshal(links)
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
+	// HERE SOMETHING'S WRONG
+	var links []string
+	for link := range pendingLinksChannel {
+		links = append(links, link)
+	}
 
-	// client := &http.Client{}
-	// req, err := http.NewRequest("POST", "http://localhost:8080", bytes.NewBuffer(jsonLinks))
-	// req.Header.Set("Content-Type", "application/json")
+	jsonLinks, err := json.Marshal(links)
+	if err != nil {
+		log.Fatal(err)
+	}
 
-	// resp, err := client.Do(req)
+	client := &http.Client{}
+	req, err := http.NewRequest("POST", "http://localhost:8080/links", bytes.NewBuffer(jsonLinks))
+	req.Header.Set("Content-Type", "application/json")
 
-	// defer func(Body io.ReadCloser) {
-	// 	err := Body.Close()
-	// 	if err != nil {
+	resp, err := client.Do(req)
 
-	// 	}
-	// }(resp.Body)
-
-	// fmt.Println("end")
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+		}
+	}(resp.Body)
 }
 
+// ManageCrawler basically handles GET Request
 func ManageCrawler(numThreads int, depth int, manager string, es *elasticsearch.Client) {
 	client := &http.Client{}
-	for i := 0; i < numThreads; i++ {
+	for i := 1; i < numThreads+1; i++ {
 		res, err := http.NewRequest("GET", manager, nil)
 		if err != nil {
 			log.Fatal(err)
@@ -240,30 +239,30 @@ func ManageCrawler(numThreads int, depth int, manager string, es *elasticsearch.
 		CID := strconv.Itoa(i)
 		q.Add("CID", CID)
 		res.URL.RawQuery = q.Encode()
-		fmt.Println("res", res.URL)
 
+		fmt.Println(res.URL)
 		resp, err := client.Do(res)
 		if err != nil {
 			log.Fatal(err)
 		}
 		body, err := io.ReadAll(resp.Body)
-		fmt.Println("B:", string(body))
 		if err != nil {
 			log.Fatal(err)
 		}
 		var links []string
 		err = json.Unmarshal(body, &links)
-		fmt.Println("Bodya", links)
+		fmt.Println("Links: ", links)
 		CrawlerMain(links, depth, len(links), es)
 	}
 }
 
-// Run crawler without task manager
 func main() {
 	es := Setup()
+	i := 0
 	fmt.Println("Crawl started!...")
-	for i := 0; i < 3; i++ {
+	for i != 1 {
 		ManageCrawler(5, 3, "http://localhost:8080/links", es)
+		fmt.Println("it: ", i)
+		i++
 	}
-
 }
