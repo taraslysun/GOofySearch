@@ -18,8 +18,10 @@ import (
 
 var id = 1
 
-func LinkToChannel(link string, crawledLinksChannel chan string) {
-	crawledLinksChannel <- link
+func LinkToChannel(link *string, wgLinks *sync.WaitGroup, crawledLinksChannel chan string, linksAmountChannel chan int) {
+	crawledLinksChannel <- *link
+	linksAmountChannel <- 1
+	wgLinks.Done()
 }
 
 // MonitorCrawling ends crawling if there is no links to scrape especially needed when working without task manager
@@ -28,28 +30,26 @@ func MonitorCrawling(pendingLinksChannel, crawledLinksChannel chan string, links
 	for j := range linksAmountChannel {
 		i += j
 
-		// check if number of pending links is 0
-		// if yes, close all the channels
 		if i == 0 {
+			fmt.Println("channels closed")
 			close(pendingLinksChannel)
 			close(crawledLinksChannel)
 			close(linksAmountChannel)
 		}
 	}
+
 }
 
 // ProcessCrawledLinks used for filtering visited links
 func ProcessCrawledLinks(pendingLinksChannel chan string, crawledLinksChannel chan string, linksAmountChannel chan int) {
 	foundUrls := make(map[string]bool)
 
-	// iterating over crawled links
-	// check if visited ? skip : add to pending links
 	for cl := range crawledLinksChannel {
 		if !foundUrls[cl] {
 			foundUrls[cl] = true
-			linksAmountChannel <- 1
 			pendingLinksChannel <- cl
 		}
+		linksAmountChannel <- -1
 	}
 }
 
@@ -98,7 +98,8 @@ func RandomString(userAgentList []string) string {
 	return userAgentList[randomIndex]
 }
 
-func extractContent(link *string, crawledLinksChannel chan string, es *elasticsearch.Client) {
+func extractContent(link *string, wgLinks *sync.WaitGroup, crawledLinksChannel chan string,
+	es *elasticsearch.Client, linksAmountChannel chan int) {
 	userAgentList := []string{
 		"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/93.0.4577.82 Safari/537.36",
 		"Mozilla/5.0 (iPhone; CPU iPhone OS 14_4_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0.3 Mobile/15E148 Safari/604.1",
@@ -152,7 +153,8 @@ func extractContent(link *string, crawledLinksChannel chan string, es *elasticse
 			case "a":
 				href, ok := extractLink(&token, link)
 				if ok {
-					go LinkToChannel(href, crawledLinksChannel)
+					wgLinks.Add(1)
+					go LinkToChannel(&href, wgLinks, crawledLinksChannel, linksAmountChannel)
 				}
 			}
 		}
@@ -168,44 +170,52 @@ func extractContent(link *string, crawledLinksChannel chan string, es *elasticse
 }
 
 func CrawlWebpage(wg *sync.WaitGroup, pendingLinksChannel chan string,
-	crawledLinksChannel chan string, linksAmountChannel chan int, depth int, es *elasticsearch.Client) {
+	crawledLinksChannel chan string, linksAmountChannel chan int, es *elasticsearch.Client) {
 
-	for link := range pendingLinksChannel {
-		extractContent(&link, crawledLinksChannel, es)
-		linksAmountChannel <- -1
-		depth--
-		if depth == 0 {
-			break
-		}
-	}
+	var wgLinks sync.WaitGroup
+
+	link := <-pendingLinksChannel
+	fmt.Println("cw ", link)
+	extractContent(&link, &wgLinks, crawledLinksChannel, es, linksAmountChannel)
+	wgLinks.Wait()
+	linksAmountChannel <- -1
+
 	wg.Done()
 }
 
-func CrawlerMain(startLinks []string, depth int, numThreads int, es *elasticsearch.Client) {
-	pendingLinksChannel := make(chan string, 2)
-	crawledLinksChannel := make(chan string)
+func CrawlerMain(startLinks []string, numLinks int, es *elasticsearch.Client) {
+	pendingLinksChannel := make(chan string)
+	crawledLinksChannel := make(chan string, 1000000)
 	linksAmountChannel := make(chan int)
 
 	for _, startLink := range startLinks {
-		go LinkToChannel(startLink, crawledLinksChannel)
+
+		go func(link string) {
+			pendingLinksChannel <- link
+			linksAmountChannel <- 1
+		}(startLink)
 	}
 
-	go ProcessCrawledLinks(pendingLinksChannel, crawledLinksChannel, linksAmountChannel)
 	go MonitorCrawling(pendingLinksChannel, crawledLinksChannel, linksAmountChannel)
 
 	var wg sync.WaitGroup
 
-	for i := 0; i < numThreads; i++ {
+	for i := 0; i < numLinks; i++ {
 		wg.Add(1)
-		go CrawlWebpage(&wg, pendingLinksChannel, crawledLinksChannel, linksAmountChannel, depth, es)
+		go CrawlWebpage(&wg, pendingLinksChannel, crawledLinksChannel, linksAmountChannel, es)
 	}
 	wg.Wait()
+
+	go ProcessCrawledLinks(pendingLinksChannel, crawledLinksChannel, linksAmountChannel)
 
 	// POST Request part
 
 	// HERE SOMETHING'S WRONG
 	var links []string
+	// linksAmountChannel <- -1000
+
 	for link := range pendingLinksChannel {
+		// fmt.Println("new ", link)
 		links = append(links, link)
 	}
 
@@ -215,6 +225,7 @@ func CrawlerMain(startLinks []string, depth int, numThreads int, es *elasticsear
 	}
 
 	client := &http.Client{}
+	fmt.Println("Amount of links: ", len(links))
 	req, err := http.NewRequest("POST", "http://localhost:8080/links", bytes.NewBuffer(jsonLinks))
 	req.Header.Set("Content-Type", "application/json")
 
@@ -228,7 +239,7 @@ func CrawlerMain(startLinks []string, depth int, numThreads int, es *elasticsear
 }
 
 // ManageCrawler basically handles GET Request
-func ManageCrawler(numThreads int, depth int, manager string, es *elasticsearch.Client) {
+func ManageCrawler(numThreads int, linksPerRoutine int, manager string, es *elasticsearch.Client) {
 	client := &http.Client{}
 	for i := 1; i < numThreads+1; i++ {
 		res, err := http.NewRequest("GET", manager, nil)
@@ -252,7 +263,8 @@ func ManageCrawler(numThreads int, depth int, manager string, es *elasticsearch.
 		var links []string
 		err = json.Unmarshal(body, &links)
 		fmt.Println("Links: ", links)
-		CrawlerMain(links, depth, len(links), es)
+		CrawlerMain(links, len(links), es)
+		fmt.Println("")
 	}
 }
 
@@ -261,8 +273,11 @@ func main() {
 	i := 0
 	fmt.Println("Crawl started!...")
 	for i != 1 {
-		ManageCrawler(5, 3, "http://localhost:8080/links", es)
+		ManageCrawler(5, 5, "http://localhost:8080/links", es)
 		fmt.Println("it: ", i)
 		i++
 	}
+	// links := []string{"https://www.amazon.com/"}
+	// CrawlerMain(links, len(links), es)
+
 }
