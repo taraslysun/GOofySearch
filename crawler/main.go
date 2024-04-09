@@ -188,7 +188,7 @@ func CrawlWebpage(wg *sync.WaitGroup, pendingLinksChannel chan string,
 
 func CrawlerMain(startLinks []string, numLinks int, es *elasticsearch.Client, mu *sync.Mutex) {
 	pendingLinksChannel := make(chan string)
-	crawledLinksChannel := make(chan string, 1000000)
+	crawledLinksChannel := make(chan string, 5000)
 	linksAmountChannel := make(chan int)
 
 	for _, startLink := range startLinks {
@@ -273,7 +273,7 @@ func ManageCrawler(numThreads int, manager string, es *elasticsearch.Client) {
 			defer func(Body io.ReadCloser) {
 				err := Body.Close()
 				if err != nil {
-
+					log.Fatal(err)
 				}
 			}(resp.Body) // Close the response body
 
@@ -288,6 +288,10 @@ func ManageCrawler(numThreads int, manager string, es *elasticsearch.Client) {
 				log.Fatal(err)
 			}
 
+			if len(links) == 0 {
+				return
+			}
+
 			fmt.Println("Links: ", links)
 			CrawlerMain(links, len(links), es, &mu)
 			fmt.Println("")
@@ -299,17 +303,9 @@ func ManageCrawler(numThreads int, manager string, es *elasticsearch.Client) {
 
 func main() {
 	es := Setup()
-	i := 0
 	fmt.Println("Crawl started!...")
-	// var mu sync.Mutex
 
-	for i != 10 {
+	for i := 0; i < 1; i++ {
 		ManageCrawler(5, "http://localhost:8080/links", es)
-		fmt.Println("it: ", i)
-		i++
 	}
-	// links := []string{"https://www.amazon.com/", "https://en.wikipedia.org/wiki/Nelson-class_battleship",
-	//   "https://en.wikipedia.org/wiki/Armstrong_Whitworth"}
-	// CrawlerMain(links, len(links), es, &mu)
-
 }

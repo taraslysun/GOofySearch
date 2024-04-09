@@ -133,9 +133,14 @@ func (tm *TaskManager) checkRedis(N int) {
 			if err != nil {
 				log.Fatal(err)
 			}
+			if tm.bpqs[N].Len() > 15 {
+				break
+			}
 			tm.bpqs[N].Push(&pq.Item{Value: link, Priority: int(linkToPush)})
 		}
 	}
+	fmt.Println()
+	fmt.Println("Len:", tm.bpqs[N].Len())
 }
 
 func (tm *TaskManager) Selector(N int) []string {
@@ -214,6 +219,10 @@ func main() {
 	N := 5
 	M := 10
 	taskManager := NewTaskManager(N, M)
+
+	for i := 1; i < N+1; i++ {
+		taskManager.checkRedis(i)
+	}
 
 	r := mux.NewRouter()
 	r.Handle("/links", taskManager).Methods("GET", "POST")
