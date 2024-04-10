@@ -197,20 +197,15 @@ func CrawlerMain(startLinks []string, numLinks int, es *elasticsearch.Client, mu
 	crawledLinksChannel := make(chan string, 100000)
 	linksAmountChannel := make(chan int)
 
-	var wgStart sync.WaitGroup
-
 	for _, startLink := range startLinks {
-		wgStart.Add(1)
 
 		go func(link string) {
-			defer wgStart.Done()
 
 			pendingLinksChannel <- link
 			linksAmountChannel <- 1
 		}(startLink)
 	}
 
-	wgStart.Wait()
 	go MonitorCrawling(pendingLinksChannel, crawledLinksChannel, linksAmountChannel)
 
 	var wg sync.WaitGroup
