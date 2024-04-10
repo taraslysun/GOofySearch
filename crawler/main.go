@@ -136,7 +136,7 @@ func extractContent(link *string, wgLinks *sync.WaitGroup, crawledLinksChannel c
 					if attr.Key == "lang" {
 						lang := attr.Val
 						if lang != "en" && lang != "en-us" && lang != "ua" {
-							break
+							return
 						}
 
 					}
@@ -168,7 +168,7 @@ func extractContent(link *string, wgLinks *sync.WaitGroup, crawledLinksChannel c
 		}
 	}
 	if title != "" && pageText != "" {
-		// fmt.Println("Content link", *link)
+		fmt.Println("Content link", *link)
 		// IndexData(title, pageText, *link, es)
 	}
 }
@@ -229,6 +229,9 @@ func CrawlerMain(startLinks []string, numLinks int, es *elasticsearch.Client, mu
 
 	client := &http.Client{}
 	fmt.Println("Amount of links: ", len(links))
+	if len(links) == 0 {
+		return
+	}
 	req, err := http.NewRequest("POST", "http://localhost:8080/links", bytes.NewBuffer(jsonLinks))
 	req.Header.Set("Content-Type", "application/json")
 
@@ -275,7 +278,7 @@ func ManageCrawler(numThreads int, manager string, es *elasticsearch.Client) {
 				if err != nil {
 					log.Fatal(err)
 				}
-			}(resp.Body) // Close the response body
+			}(resp.Body)
 
 			body, err := io.ReadAll(resp.Body)
 			if err != nil {

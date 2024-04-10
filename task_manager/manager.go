@@ -99,7 +99,6 @@ func (tm *TaskManager) handlePostLinks(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	}
 
-	fmt.Println("POST Links", links)
 	tm.Prioritize(links)
 	tm.Router()
 
