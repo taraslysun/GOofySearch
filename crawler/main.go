@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/elastic/go-elasticsearch/v7"
 	"golang.org/x/net/html"
@@ -31,7 +32,6 @@ func MonitorCrawling(pendingLinksChannel, crawledLinksChannel chan string, links
 		i += j
 
 		if i == 0 {
-			fmt.Println("channels closed")
 			close(pendingLinksChannel)
 			close(crawledLinksChannel)
 			close(linksAmountChannel)
@@ -61,9 +61,15 @@ func getResponse(link *string, agent string) *http.Response {
 
 	req.Header.Set("User-Agent", agent)
 
-	client := &http.Client{}
+	client := &http.Client{
+		Timeout: 2 * time.Second,
+	}
 	resp, err := client.Do(req)
 	if err != nil {
+		return nil
+	}
+	if resp.StatusCode != http.StatusOK {
+		resp.Body.Close()
 		return nil
 	}
 	return resp
@@ -168,8 +174,8 @@ func extractContent(link *string, wgLinks *sync.WaitGroup, crawledLinksChannel c
 		}
 	}
 	if title != "" && pageText != "" {
-		fmt.Println("Content link", *link)
-		// IndexData(title, pageText, *link, es)
+		fmt.Println(strconv.Itoa(id), " Content link", *link)
+		IndexData(title, pageText, *link, es)
 	}
 }
 
@@ -188,17 +194,23 @@ func CrawlWebpage(wg *sync.WaitGroup, pendingLinksChannel chan string,
 
 func CrawlerMain(startLinks []string, numLinks int, es *elasticsearch.Client, mu *sync.Mutex) {
 	pendingLinksChannel := make(chan string)
-	crawledLinksChannel := make(chan string, 5000)
+	crawledLinksChannel := make(chan string, 100000)
 	linksAmountChannel := make(chan int)
 
+	var wgStart sync.WaitGroup
+
 	for _, startLink := range startLinks {
+		wgStart.Add(1)
 
 		go func(link string) {
+			defer wgStart.Done()
+
 			pendingLinksChannel <- link
 			linksAmountChannel <- 1
 		}(startLink)
 	}
 
+	wgStart.Wait()
 	go MonitorCrawling(pendingLinksChannel, crawledLinksChannel, linksAmountChannel)
 
 	var wg sync.WaitGroup
@@ -211,14 +223,9 @@ func CrawlerMain(startLinks []string, numLinks int, es *elasticsearch.Client, mu
 
 	go ProcessCrawledLinks(pendingLinksChannel, crawledLinksChannel, linksAmountChannel)
 
-	// POST Request part
-
-	// HERE SOMETHING'S WRONG
 	var links []string
-	// linksAmountChannel <- -1000
 
 	for link := range pendingLinksChannel {
-		// fmt.Println("new ", link)
 		links = append(links, link)
 	}
 
@@ -236,13 +243,7 @@ func CrawlerMain(startLinks []string, numLinks int, es *elasticsearch.Client, mu
 	req.Header.Set("Content-Type", "application/json")
 
 	mu.Lock()
-	resp, err := client.Do(req)
-
-	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
-		}
-	}(resp.Body)
+	client.Do(req)
 	mu.Unlock()
 }
 
@@ -253,10 +254,10 @@ func ManageCrawler(numThreads int, manager string, es *elasticsearch.Client) {
 	var mu sync.Mutex
 
 	for i := 1; i <= numThreads; i++ {
-		wg.Add(1) // Increment WaitGroup counter for each goroutine
+		wg.Add(1)
 
 		go func(id int) {
-			defer wg.Done() // Decrement WaitGroup counter when the goroutine exits
+			defer wg.Done()
 
 			res, err := http.NewRequest("GET", manager, nil)
 			if err != nil {
@@ -295,20 +296,23 @@ func ManageCrawler(numThreads int, manager string, es *elasticsearch.Client) {
 				return
 			}
 
-			fmt.Println("Links: ", links)
+			// fmt.Println("Links: ", len(links))
 			CrawlerMain(links, len(links), es, &mu)
 			fmt.Println("")
 		}(i)
 	}
 
-	wg.Wait() // Wait for all goroutines to finish
+	wg.Wait()
 }
 
 func main() {
 	es := Setup()
 	fmt.Println("Crawl started!...")
 
-	for i := 0; i < 1; i++ {
-		ManageCrawler(5, "http://localhost:8080/links", es)
+	i := 0
+	for {
+		ManageCrawler(8, "http://localhost:8080/links", es)
+		fmt.Println("Iteration:", i)
+		i++
 	}
 }

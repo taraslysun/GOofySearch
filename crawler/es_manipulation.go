@@ -5,26 +5,36 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"log"
+	"strconv"
+
 	"github.com/elastic/go-elasticsearch/esapi"
 	"github.com/elastic/go-elasticsearch/v7"
-	"io"
-	"strconv"
 )
 
-func Setup() *elasticsearch.Client {
-	// create a new Elasticsearch client
+var CFG = elasticsearch.Config{
+	CloudID: "mini-google:ZXVyb3BlLXdlc3QzLmdjcC5jbG91ZC5lcy5pbzo0NDMkZWRmNDdlMTMzNWQzNGEyMGFkMWFiMDg2Mjc5ODZkNWEkYjRkZTRjNjZlNDkyNGI1NDhhMjNkNWYyNTE5ZTNhZDk=",
+	APIKey:  "VVpJRnlZNEJfRzZqUW1QVnVESFI6ek44cEdIVFNTMVdGNldTVVhRY0V2Zw==",
+}
 
-	es, err := elasticsearch.NewDefaultClient()
+func Setup() *elasticsearch.Client {
+	es, err := elasticsearch.NewClient(CFG)
 	if err != nil {
-		fmt.Println("Error creating Elasticsearch client:", err)
-		return nil
+		log.Fatalf("Error creating the client: %s", err)
 	}
+
+	infores, err := es.Info()
+	if err != nil {
+		log.Fatalf("Error getting response: %s", err)
+	}
+
+	fmt.Println(infores)
 
 	return es
 }
 
 func IndexData(title, pageText, link string, es *elasticsearch.Client) {
-	// index data to elasticsearch
 	doc := map[string]interface{}{
 		"title": title,
 		"text":  pageText,
