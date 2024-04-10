@@ -1,8 +1,9 @@
 import Main from "../components/Main";
+import "./home-styles.css";
 
 function Home() {
   return (
-    <div>
+    <div className="home">
       <Main />
     </div>
   );

@@ -1,4 +1,4 @@
-import logo from "../assets/goofle.png";
+import logo from "../assets/goofle_logo.png";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 

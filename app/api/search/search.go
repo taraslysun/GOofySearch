@@ -2,8 +2,10 @@ package search
 
 import (
 	"back/utils"
+	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 
 	"github.com/elastic/go-elasticsearch/v8"
@@ -11,13 +13,44 @@ import (
 
 func Search(query string, es *elasticsearch.Client) utils.Response {
 
+	var buf bytes.Buffer
+	queryBody := map[string]interface{}{
+		"query": map[string]interface{}{
+			"bool": map[string]interface{}{
+				"should": []map[string]interface{}{
+					{
+						"match": map[string]interface{}{
+							"text": map[string]interface{}{
+								"query": query,
+								"boost": 1,
+							},
+						},
+					},
+					{
+						"match": map[string]interface{}{
+							"title": map[string]interface{}{
+								"query": query,
+								"boost": 3,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	if err := json.NewEncoder(&buf).Encode(queryBody); err != nil {
+		log.Fatalf("Error encoding query: %s", err)
+	}
+
 	searchResp, err := es.Search(
 		es.Search.WithContext(context.Background()),
 		es.Search.WithIndex("test"),
-		es.Search.WithQuery(query),
+		es.Search.WithBody(&buf),
 		es.Search.WithTrackTotalHits(true),
 		es.Search.WithPretty(),
 	)
+	fmt.Println("Elastic search request")
 
 	if err != nil {
 		log.Fatalf("Error getting response: %s", err)
