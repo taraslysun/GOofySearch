@@ -23,7 +23,7 @@ type Response struct {
 			Source struct {
 				Title string `json:"title"`
 				Text  string `json:"text"`
-				Url   string `json:"url"`
+				Link  string `json:"link"`
 			} `json:"_source"`
 		} `json:"hits"`
 	} `json:"hits"`

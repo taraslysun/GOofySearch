@@ -27,19 +27,23 @@ function Results({ query }) {
 
   for (let i = 0; i < data.length; i++) {
     console.log(data[i]["_id"]);
-    console.log(data[i]["_source"]["title"]);
+    console.log(data[i]["_source"]);
+    // console.log(data[i]);
   }
 
   return (
     <div className="results">
       {data.map((hit) => (
-        <a
-          key={hit["_id"]}
-          href={hit["_source"]["url"]}
-          className="result-item"
-        >
-          {hit["_source"]["title"]}
-        </a>
+        <div key={hit["_id"]} className="results-container">
+          <h3 className="result-title">{hit["_source"]["title"]}</h3>
+          <a
+            key={hit["_id"]}
+            href={hit["_source"]["link"]}
+            className="result-item"
+          >
+            {hit["_source"]["link"]}
+          </a>
+        </div>
       ))}
     </div>
   );
