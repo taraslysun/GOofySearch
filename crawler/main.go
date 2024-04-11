@@ -17,7 +17,7 @@ import (
 	"golang.org/x/net/html"
 )
 
-var id = 1
+var id = 34546
 
 func LinkToChannel(link *string, wgLinks *sync.WaitGroup, crawledLinksChannel chan string, linksAmountChannel chan int) {
 	crawledLinksChannel <- *link
@@ -193,18 +193,24 @@ func CrawlWebpage(wg *sync.WaitGroup, pendingLinksChannel chan string,
 }
 
 func CrawlerMain(startLinks []string, numLinks int, es *elasticsearch.Client, mu *sync.Mutex) {
-	pendingLinksChannel := make(chan string)
+	pendingLinksChannel := make(chan string, 100)
 	crawledLinksChannel := make(chan string, 100000)
-	linksAmountChannel := make(chan int)
+	linksAmountChannel := make(chan int, 100)
+
+	var wgStart sync.WaitGroup
 
 	for _, startLink := range startLinks {
+		wgStart.Add(1)
 
 		go func(link string) {
+			defer wgStart.Done()
 
 			pendingLinksChannel <- link
 			linksAmountChannel <- 1
 		}(startLink)
 	}
+
+	wgStart.Wait()
 
 	go MonitorCrawling(pendingLinksChannel, crawledLinksChannel, linksAmountChannel)
 
