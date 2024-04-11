@@ -75,6 +75,38 @@ func (tm *TaskManager) handleGetLinks(w http.ResponseWriter, r *http.Request) {
 	}
 
 	links := tm.Selector(crawlerId)
+
+	for len(links) < 15 {
+		newLinks, err := tm.redisClient.ZPopMax(tm.ctx, tm.redisQueue).Result()
+
+		if errors.Is(err, redis.Nil) {
+
+		}
+		if len(newLinks) == 0 {
+			break
+		}
+
+		links = append(links, newLinks[0].Member.(string))
+		newLinkDomain := strings.Split(newLinks[0].Member.(string), "/")[2]
+		res, err := tm.redisClient.ZPopMax(tm.ctx, tm.redisQueue, 15).Result()
+		if errors.Is(err, redis.Nil) {
+			log.Fatal(err)
+		}
+		for _, linkObj := range res {
+			link := linkObj.Member.(string)
+			linkDomain := strings.Split(link, "/")[2]
+			if linkDomain == newLinkDomain {
+				if err != nil {
+					log.Fatal(err)
+				}
+				links = append(links, link)
+				if len(links) >= 15 {
+					break
+				}
+			}
+		}
+	}
+
 	response, err := json.Marshal(links)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -111,8 +143,10 @@ func (tm *TaskManager) handlePostLinks(w http.ResponseWriter, r *http.Request) {
 func (tm *TaskManager) checkRedis(N int) {
 
 	newLink, err := tm.redisClient.ZPopMax(tm.ctx, tm.redisQueue).Result()
+	fmt.Println("New link: ", newLink)
 
-	if errors.Is(err, redis.Nil) {
+	if len(newLink) == 0 {
+		return
 	}
 
 	tm.bpqs[N].Push(&pq.Item{
@@ -120,26 +154,26 @@ func (tm *TaskManager) checkRedis(N int) {
 		Value:    newLink[0].Member.(string),
 	})
 
-	res, err := tm.redisClient.ZRange(tm.ctx, tm.redisQueue, 0, -1).Result()
+	res, err := tm.redisClient.ZPopMax(tm.ctx, tm.redisQueue, 15).Result()
 
 	if errors.Is(err, redis.Nil) {
 		log.Fatal(err)
 	}
 
 	for _, link := range res {
-		if strings.Split(link, "/")[2] == strings.Split(newLink[0].Member.(string), "/")[2] {
-			linkToPush, err := tm.redisClient.ZRem(tm.ctx, tm.redisQueue, link).Result()
+		linkDomain := strings.Split(link.Member.(string), "/")[2]
+		if linkDomain == strings.Split(newLink[0].Member.(string), "/")[2] {
 			if err != nil {
 				log.Fatal(err)
 			}
-			if tm.bpqs[N].Len() > 15 {
+			if tm.bpqs[N].Len() >= 15 {
 				break
 			}
-			tm.bpqs[N].Push(&pq.Item{Value: link, Priority: int(linkToPush)})
+			tm.bpqs[N].Push(&pq.Item{Value: link.Member.(string), Priority: int(link.Score)})
+
 		}
 	}
 	fmt.Println()
-	fmt.Println("Len:", tm.bpqs[N].Len())
 }
 
 func (tm *TaskManager) Selector(N int) []string {
@@ -156,15 +190,18 @@ func (tm *TaskManager) Selector(N int) []string {
 
 func (tm *TaskManager) Router() {
 	fpqsLen := len(tm.fpqs)
-	for i := 0; i < fpqsLen; i++ {
+	cntMap := make(map[string]int)
+	for i := fpqsLen - 1; i > 0; i-- {
 		fpq := tm.fpqs[i]
 		fpqLen := fpq.Len()
 		for k := 0; k < fpqLen; k++ {
 			link := fpq.Pop().(*pq.Item)
+			cntMap[strings.Split(link.Value, "/")[2]]++
 			var pushed bool
 			for _, q := range tm.bpqs {
-				// since split url looks like this : ['https:', '', 'github.com', 'taraslysun', 'GOofySearch', 'tree', 'concurrent_crawler']
-				// we take 2nd element from split array
+				if (*q).Len() >= 15 {
+					break
+				}
 				if (*q).Len() == 0 {
 					q.Push(link)
 					pushed = true
@@ -176,6 +213,9 @@ func (tm *TaskManager) Router() {
 				}
 			}
 			if !pushed {
+				if cntMap[strings.Split(link.Value, "/")[2]] >= 15 {
+					continue
+				}
 				err := tm.redisClient.ZAdd(tm.ctx, tm.redisQueue, &redis.Z{
 					Score:  float64(link.Priority),
 					Member: link.Value,
@@ -194,7 +234,7 @@ func (tm *TaskManager) Prioritize(links []string) {
 		depth := len(strings.Split(link, "/"))
 		domain, err := url.Parse(link)
 		if err != nil {
-			log.Fatal(err)
+			continue
 		}
 		hostname := domain.Hostname()
 		timesVisited := tm.timesVisited[hostname]
@@ -208,15 +248,15 @@ func (tm *TaskManager) Prioritize(links []string) {
 }
 
 func calcPriority(timesVisited int, depth int, M int) int {
-	priority := M - timesVisited*(1/2) + depth*(1/2)
+	priority := M - (timesVisited*(1/2) + depth*(1/2))
 	return priority
 }
 
 // -----------------------------------------------------------
 
 func main() {
-	N := 5
-	M := 10
+	N := 8
+	M := 100
 	taskManager := NewTaskManager(N, M)
 
 	for i := 1; i < N+1; i++ {
@@ -229,11 +269,3 @@ func main() {
 	log.Println("Task Manager server is running on port 8080...")
 	log.Fatal(http.ListenAndServe(":8080", r))
 }
-
-/*
-to run the server, run the following command in the task_manager directory:
-   	go run manager.go
-to test the server, run the following command:
-	curl -X POST -d '["http://example.com"]' http://localhost:8080/links
- 	curl -X GET http://localhost:8080/links
-*/
