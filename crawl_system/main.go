@@ -4,6 +4,7 @@ import (
     "dcs/core"
     "os"
 	"fmt"
+	"strconv"
 )
 
 func main() {
@@ -14,7 +15,8 @@ func main() {
     case "master":
         core.GetMasterNode(masterIp).Start()
     case "worker":
-        core.GetWorkerNode(masterIp).Start()
+		id, _ := strconv.Atoi(os.Args[3])
+        core.GetWorkerNode(masterIp, id).Start()
     default:
         panic("invalid node type")
     }

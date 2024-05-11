@@ -12,6 +12,8 @@ import (
     "log"
 	"strconv"
     "io"
+    "dcs/crawler"
+
 )
 
 // MasterNode is the node instance
@@ -54,8 +56,6 @@ func (n *MasterNode) Init(masterIp string) (err error) {
             return
         }
 
-        fmt.Println("Post handler")
-
         // post to task manager
         links := strings.Split(payload.Links, " ")
         
@@ -75,10 +75,15 @@ func (n *MasterNode) Init(masterIp string) (err error) {
         
     })
 
-    n.api.GET("/notify", func(c *gin.Context) {
-        id := 1
+    n.api.GET("/notify/:id", func(c *gin.Context) {
+        id, _ := strconv.Atoi(c.Param("id"))
         n.DistributeLinks(id)
-      })
+        c.AbortWithStatus(http.StatusOK)
+
+    })
+
+    n.DistributeLinks(1)
+    go crawler.MasterCrawler(nil, n.masterIP)
 
     return nil
 }
@@ -90,6 +95,11 @@ func (n *MasterNode) Start() {
 
     // start api server
     _ = n.api.Run(n.masterIP+":9092")
+
+    // run master crawler
+
+    // create es client
+    // es := crawler.Setup()    
 
     // wait for exit
     n.svr.Stop()

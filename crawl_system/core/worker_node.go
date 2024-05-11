@@ -8,17 +8,20 @@ import (
     "dcs/crawler"
     "net/http"
     "log"
+    "strconv"
 )
 
 type WorkerNode struct {
     conn *grpc.ClientConn  // grpc client connection
     c    NodeServiceClient // grpc client
     masterIP string // ip address of master node
+    ID int // int of this worker node
 }
 
-func (n *WorkerNode) Init(masterIp string) (err error) {
+func (n *WorkerNode) Init(masterIp string, id int) (err error) {
 
     n.masterIP = masterIp
+    n.ID = id
 
     // connect to master node
     n.conn, err = grpc.Dial(n.masterIP+":50051", grpc.WithInsecure())
@@ -60,7 +63,7 @@ func (n *WorkerNode) Start() {
         
         crawler.CrawlerMain(links, len(links), nil)
         
-        resp, err := http.Get("http://"+ n.masterIP+":9092/notify")
+        resp, err := http.Get("http://"+ n.masterIP+":9092/notify/"+strconv.Itoa(n.ID))
         if err != nil {
           log.Fatal(err)
         }
@@ -74,13 +77,13 @@ func (n *WorkerNode) Start() {
 
 var workerNode *WorkerNode
 
-func GetWorkerNode(masterIp string) *WorkerNode {
+func GetWorkerNode(masterIp string, id int) *WorkerNode {
     if workerNode == nil {
         // node
         workerNode = &WorkerNode{}
 
         // initialize node
-        if err := workerNode.Init(masterIp); err != nil {
+        if err := workerNode.Init(masterIp, id); err != nil {
             panic(err)
         }
     }

@@ -14,6 +14,7 @@ import (
 
 	"github.com/elastic/go-elasticsearch/v7"
 	"golang.org/x/net/html"
+	"log"
 )
 
 var id = 0
@@ -252,7 +253,73 @@ func CrawlerMain(startLinks []string, numLinks int, es *elasticsearch.Client) {
 	}
 	defer resp.Body.Close()
 
-
-	
 }
 
+
+func MasterCrawler(es *elasticsearch.Client, masterIp string) {
+	client := &http.Client{}
+	var wg sync.WaitGroup
+
+	for {
+		for i := 1; i <= 5; i++ {
+			wg.Add(1)
+
+			go func(id int) {
+				defer wg.Done()
+
+				res, err := http.NewRequest("GET", "http://localhost:8080/links", nil)
+				if err != nil {
+					log.Fatal(err)
+				}
+
+				q := res.URL.Query()
+				q.Add("CID", strconv.Itoa(id))
+				res.URL.RawQuery = q.Encode()
+
+				fmt.Println(res.URL)
+
+				resp, err := client.Do(res)
+				if err != nil {
+					log.Fatal(err)
+				}
+				defer func(Body io.ReadCloser) {
+					err := Body.Close()
+					if err != nil {
+						log.Fatal(err)
+					}
+				}(resp.Body)
+
+				body, err := io.ReadAll(resp.Body)
+				if err != nil {
+					log.Fatal(err)
+				}
+
+				var links []string
+				err = json.Unmarshal(body, &links)
+				if err != nil {
+					log.Fatal(err)
+				}
+
+				if len(links) == 0 {
+					return
+				}
+
+				CrawlerMain(links, len(links), es)
+				fmt.Println("")
+			}(1)
+
+		}
+		wg.Wait()
+
+		// notify master node
+		resp, err := http.Get("http://"+ masterIp+":9092/notify")
+        if err != nil {
+          log.Fatal(err)
+        }
+    
+        err = resp.Body.Close()
+        if err != nil {
+          log.Fatal(err)
+        }
+	}
+}
