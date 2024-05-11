@@ -14,8 +14,8 @@ import (
 )
 
 var CFG = elasticsearch.Config{
-	CloudID: "mini-google:ZXVyb3BlLXdlc3QzLmdjcC5jbG91ZC5lcy5pbzo0NDMkZWRmNDdlMTMzNWQzNGEyMGFkMWFiMDg2Mjc5ODZkNWEkYjRkZTRjNjZlNDkyNGI1NDhhMjNkNWYyNTE5ZTNhZDk=",
-	APIKey:  "VVpJRnlZNEJfRzZqUW1QVnVESFI6ek44cEdIVFNTMVdGNldTVVhRY0V2Zw==",
+	CloudID: "mini-google:ZXVyb3BlLXdlc3Q5LmdjcC5lbGFzdGljLWNsb3VkLmNvbTo0NDMkZWRhMWY0MTkyZmJiNGM3YjhiNDQ2ODk4NjBiNGMyNTckOTUzOThlMjVmNjdmNDA4MzhiYzJhOTE4ODAyZDZjYmI=",
+	APIKey:  "NFBZcGFJOEJ1WDg3RXdUSUlaX2o6M0hsZkdsWGlSeEtZc1M0NGpqUXkzZw==",
 }
 
 func Setup() *elasticsearch.Client {

@@ -88,7 +88,9 @@ func (n *MasterNode) Init(masterIp string, numWorkers int) (err error) {
     for i := 0; i < numWorkers; i++ {
         n.DistributeLinks(i+1)
     }
-    go crawler.MasterCrawler(nil, n.masterIP)
+    // create es client
+    es := crawler.Setup()
+    go crawler.MasterCrawler(es, n.masterIP)
 
     return nil
 }
@@ -99,12 +101,7 @@ func (n *MasterNode) Start() {
     go n.svr.Serve(n.ln)
 
     // start api server
-    _ = n.api.Run(n.masterIP+":9092")
-
-    // run master crawler
-
-    // create es client
-    // es := crawler.Setup()    
+    _ = n.api.Run(n.masterIP+":9092")  
 
     // wait for exit
     n.svr.Stop()

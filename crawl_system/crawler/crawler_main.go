@@ -175,7 +175,7 @@ func extractContent(link *string, wgLinks *sync.WaitGroup, crawledLinksChannel c
 	}
 	if title != "" && pageText != "" {
 		fmt.Println(strconv.Itoa(id), " Content link", *link)
-		// IndexData(title, pageText, *link, es)
+		IndexData(title, pageText, *link, es)
 	}
 }
 
