@@ -41,7 +41,7 @@ func (n *WorkerNode) Start() {
     fmt.Println("worker node started")
 
     // create es client
-    // es := crawler.Setup()
+    es := crawler.Setup()
 
     // report status
     _, _ = n.c.ReportStatus(context.Background(), &Request{})
@@ -74,7 +74,7 @@ func (n *WorkerNode) Start() {
 
             go func() {
                 defer wg.Done()
-                crawler.CrawlerMain(links, len(links), nil)
+                crawler.CrawlerMain(links, len(links), es)
             }()
 
         }

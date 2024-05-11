@@ -149,7 +149,6 @@ func (n *MasterNode) DistributeLinks(id int) {
     joined := strings.Join(links, " ")
 
     // move links to LinksChannel
-    fmt.Println("moving links to links channel, len: ", len(links))
     n.nodeSvr.LinksChannel <- joined
 }
 
