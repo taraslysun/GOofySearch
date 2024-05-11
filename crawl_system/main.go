@@ -8,12 +8,13 @@ import (
 
 func main() {
     nodeType := os.Args[1]
+	masterIp := os.Args[2]
 	fmt.Println("Starting")
     switch nodeType {
     case "master":
-        core.GetMasterNode().Start()
+        core.GetMasterNode(masterIp).Start()
     case "worker":
-        core.GetWorkerNode().Start()
+        core.GetWorkerNode(masterIp).Start()
     default:
         panic("invalid node type")
     }

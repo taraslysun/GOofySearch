@@ -6,16 +6,22 @@ import (
 	"fmt"
     "strings"
     "dcs/crawler"
+    "net/http"
+    "log"
 )
 
 type WorkerNode struct {
     conn *grpc.ClientConn  // grpc client connection
     c    NodeServiceClient // grpc client
+    masterIP string // ip address of master node
 }
 
-func (n *WorkerNode) Init() (err error) {
+func (n *WorkerNode) Init(masterIp string) (err error) {
+
+    n.masterIP = masterIp
+
     // connect to master node
-    n.conn, err = grpc.Dial("localhost:50051", grpc.WithInsecure())
+    n.conn, err = grpc.Dial(n.masterIP+":50051", grpc.WithInsecure())
     if err != nil {
         return err
     }
@@ -42,31 +48,39 @@ func (n *WorkerNode) Start() {
         // receive links from master node
         res, err := stream.Recv()
         if err != nil {
-            return
+          return
         }
-
-
-        // run CrawlerMain with recieved links
+    
+        // run CrawlerMain with received links
         links := strings.Split(res.Data, " ")
         // log command
         fmt.Println("worker received links: ", len(links))
-
+    
         // TODO: divide links, run multiple CrawlerMain
+        
         crawler.CrawlerMain(links, len(links), nil)
-
-
-    }
+        
+        resp, err := http.Get("http://"+ n.masterIP+":9092/notify")
+        if err != nil {
+          log.Fatal(err)
+        }
+    
+        err = resp.Body.Close()
+        if err != nil {
+          log.Fatal(err)
+        }
+      }
 }
 
 var workerNode *WorkerNode
 
-func GetWorkerNode() *WorkerNode {
+func GetWorkerNode(masterIp string) *WorkerNode {
     if workerNode == nil {
         // node
         workerNode = &WorkerNode{}
 
         // initialize node
-        if err := workerNode.Init(); err != nil {
+        if err := workerNode.Init(masterIp); err != nil {
             panic(err)
         }
     }

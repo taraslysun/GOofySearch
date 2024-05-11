@@ -9,6 +9,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"encoding/json"
+	"bytes"
 
 	"github.com/elastic/go-elasticsearch/v7"
 	"golang.org/x/net/html"
@@ -228,11 +230,29 @@ func CrawlerMain(startLinks []string, numLinks int, es *elasticsearch.Client) {
 	}
 
 	fmt.Println("Amount of links: ", len(links))
-	if len(links) == 0 {
+	// if len(links) == 0 {
+	// 	return
+	// }
+
+	linksStr := strings.Join(links, " ")
+
+	payload := map[string]string{
+		"links": linksStr,
+	}
+	jsonPayload, err := json.Marshal(payload)
+	if err != nil {
+		fmt.Println("Error marshaling JSON:", err)
 		return
 	}
 
-	// post to :9092 (string of links)
+	resp, err := http.Post("http://10.10.230.30:9092/links", "application/json", bytes.NewBuffer(jsonPayload))
+	if err != nil {
+		fmt.Println("Error making POST request:", err)
+		return
+	}
+	defer resp.Body.Close()
+
+
 	
 }
 

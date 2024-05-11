@@ -20,11 +20,15 @@ type MasterNode struct {
     ln      net.Listener           // listener
     svr     *grpc.Server           // grpc server
     nodeSvr *NodeServiceGrpcServer // node service
+    masterIP string // ip address of master node
 }
 
-func (n *MasterNode) Init() (err error) {
+func (n *MasterNode) Init(masterIp string) (err error) {
+
+    n.masterIP = masterIp
+
     // grpc server listener with port as 50051
-    n.ln, err = net.Listen("tcp", ":50051")
+    n.ln, err = net.Listen("tcp", n.masterIP+":50051")
     if err != nil {
         return err
     }
@@ -53,9 +57,7 @@ func (n *MasterNode) Init() (err error) {
         fmt.Println("Post handler")
 
         // post to task manager
-
         links := strings.Split(payload.Links, " ")
-        fmt.Println(links)
         
         jsonLinks, err := json.Marshal(links)
         if err != nil {
@@ -68,12 +70,15 @@ func (n *MasterNode) Init() (err error) {
 	    req.Header.Set("Content-Type", "application/json")
 
         client.Do(req)
-        id := 1
-        n.DistributeLinks(id)
 
         c.AbortWithStatus(http.StatusOK)
         
     })
+
+    n.api.GET("/notify", func(c *gin.Context) {
+        id := 1
+        n.DistributeLinks(id)
+      })
 
     return nil
 }
@@ -84,7 +89,7 @@ func (n *MasterNode) Start() {
     go n.svr.Serve(n.ln)
 
     // start api server
-    _ = n.api.Run(":9092")
+    _ = n.api.Run(n.masterIP+":9092")
 
     // wait for exit
     n.svr.Stop()
@@ -139,13 +144,13 @@ func (n *MasterNode) DistributeLinks(id int) {
 var node *MasterNode
 
 // GetMasterNode returns the node instance
-func GetMasterNode() *MasterNode {
+func GetMasterNode(masterIp string) *MasterNode {
     if node == nil {
         // node
         node = &MasterNode{}
 
         // initialize node
-        if err := node.Init(); err != nil {
+        if err := node.Init(masterIp); err != nil {
             panic(err)
         }
     }
