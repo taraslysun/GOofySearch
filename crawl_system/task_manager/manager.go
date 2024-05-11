@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	pq "manager/priority_queue"
+	pq "dcs/task_manager/priority_queue"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -130,6 +130,7 @@ func (tm *TaskManager) handlePostLinks(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	}
+	// fmt.Println("links from post: ", links)
 
 	tm.Prioritize(links)
 	tm.Router()
