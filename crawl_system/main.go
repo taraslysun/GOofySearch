@@ -13,7 +13,8 @@ func main() {
 	fmt.Println("Starting")
     switch nodeType {
     case "master":
-        core.GetMasterNode(masterIp).Start()
+		numWorkers, _ := strconv.Atoi(os.Args[3])
+        core.GetMasterNode(masterIp, numWorkers).Start()
     case "worker":
 		id, _ := strconv.Atoi(os.Args[3])
         core.GetWorkerNode(masterIp, id).Start()

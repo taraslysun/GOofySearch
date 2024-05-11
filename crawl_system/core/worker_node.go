@@ -9,6 +9,7 @@ import (
     "net/http"
     "log"
     "strconv"
+    "sync"
 )
 
 type WorkerNode struct {
@@ -48,20 +49,6 @@ func (n *WorkerNode) Start() {
     // assign task
     stream, _ := n.c.AssignTask(context.Background(), &Request{})
     for {
-        // receive links from master node
-        res, err := stream.Recv()
-        if err != nil {
-          return
-        }
-    
-        // run CrawlerMain with received links
-        links := strings.Split(res.Data, " ")
-        // log command
-        fmt.Println("worker received links: ", len(links))
-    
-        // TODO: divide links, run multiple CrawlerMain
-        
-        crawler.CrawlerMain(links, len(links), nil)
         
         resp, err := http.Get("http://"+ n.masterIP+":9092/notify/"+strconv.Itoa(n.ID))
         if err != nil {
@@ -72,6 +59,28 @@ func (n *WorkerNode) Start() {
         if err != nil {
           log.Fatal(err)
         }
+        
+        var wg sync.WaitGroup
+        for i := 1; i <= 5; i++ {
+            wg.Add(1)
+            // receive links from master node
+            res, err := stream.Recv()
+            if err != nil {
+                return
+            }
+        
+            // run CrawlerMain with received links
+            links := strings.Split(res.Data, " ")
+
+            go func() {
+                defer wg.Done()
+                crawler.CrawlerMain(links, len(links), nil)
+            }()
+
+        }
+        wg.Wait()
+
+    
       }
 }
 

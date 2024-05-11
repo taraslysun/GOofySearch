@@ -25,7 +25,7 @@ type MasterNode struct {
     masterIP string // ip address of master node
 }
 
-func (n *MasterNode) Init(masterIp string) (err error) {
+func (n *MasterNode) Init(masterIp string, numWorkers int) (err error) {
 
     n.masterIP = masterIp
 
@@ -77,12 +77,17 @@ func (n *MasterNode) Init(masterIp string) (err error) {
 
     n.api.GET("/notify/:id", func(c *gin.Context) {
         id, _ := strconv.Atoi(c.Param("id"))
-        n.DistributeLinks(id)
+
+        for i := 1; i <= 5; i++ {
+            n.DistributeLinks(id)
+        }
         c.AbortWithStatus(http.StatusOK)
 
     })
 
-    n.DistributeLinks(1)
+    for i := 0; i < numWorkers; i++ {
+        n.DistributeLinks(i+1)
+    }
     go crawler.MasterCrawler(nil, n.masterIP)
 
     return nil
@@ -154,13 +159,13 @@ func (n *MasterNode) DistributeLinks(id int) {
 var node *MasterNode
 
 // GetMasterNode returns the node instance
-func GetMasterNode(masterIp string) *MasterNode {
+func GetMasterNode(masterIp string, numWorkers int) *MasterNode {
     if node == nil {
         // node
         node = &MasterNode{}
 
         // initialize node
-        if err := node.Init(masterIp); err != nil {
+        if err := node.Init(masterIp, numWorkers); err != nil {
             panic(err)
         }
     }
