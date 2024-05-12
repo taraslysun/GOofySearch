@@ -192,7 +192,7 @@ func CrawlWebpage(wg *sync.WaitGroup, pendingLinksChannel chan string,
 	wg.Done()
 }
 
-func CrawlerMain(startLinks []string, numLinks int, es *elasticsearch.Client) {
+func CrawlerMain(startLinks []string, numLinks int, es *elasticsearch.Client, masterIp string) {
 	pendingLinksChannel := make(chan string, 100)
 	crawledLinksChannel := make(chan string, 100000)
 	linksAmountChannel := make(chan int, 100)
@@ -246,7 +246,7 @@ func CrawlerMain(startLinks []string, numLinks int, es *elasticsearch.Client) {
 		return
 	}
 
-	resp, err := http.Post("http://10.10.230.30:9092/links", "application/json", bytes.NewBuffer(jsonPayload))
+	resp, err := http.Post("http://" + masterIp+ ":9092/links", "application/json", bytes.NewBuffer(jsonPayload))
 	if err != nil {
 		fmt.Println("Error making POST request:", err)
 		return
@@ -304,7 +304,7 @@ func MasterCrawler(es *elasticsearch.Client, masterIp string) {
 					return
 				}
 
-				CrawlerMain(links, len(links), es)
+				CrawlerMain(links, len(links), es, masterIp)
 				fmt.Println("")
 			}(1)
 

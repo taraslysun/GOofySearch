@@ -74,7 +74,7 @@ func (n *WorkerNode) Start() {
 
             go func() {
                 defer wg.Done()
-                crawler.CrawlerMain(links, len(links), es)
+                crawler.CrawlerMain(links, len(links), es, n.masterIP)
             }()
 
         }
