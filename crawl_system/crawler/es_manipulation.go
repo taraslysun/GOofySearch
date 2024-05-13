@@ -50,7 +50,7 @@ func IndexData(title, pageText, link string, es *elasticsearch.Client) {
 	}
 
 	req := esapi.IndexRequest{
-		Index:      "test1",
+		Index:      "final_data",
 		DocumentID: strconv.Itoa(int(id.Get())),
 		Body:       bytes.NewReader(body),
 		Refresh:    "true",

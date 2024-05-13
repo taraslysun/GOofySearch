@@ -270,8 +270,6 @@ func CrawlerMain(startLinks []string, numLinks int, es *elasticsearch.Client, ma
 		return
 	}
 
-	fmt.Println("Amount of links: ", len(links))
-
 	resp, err := http.Post("http://" + masterIp+ ":9092/links", "application/json", bytes.NewBuffer(jsonPayload))
 	if err != nil {
 		fmt.Println("Error making POST request:", err)
