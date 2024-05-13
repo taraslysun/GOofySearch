@@ -80,8 +80,6 @@ func (tm *TaskManager) handleGetLinks(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Cannot convert id to int", http.StatusBadRequest)
 	}
 
-	fmt.Println("Get")
-
 	links := tm.Selector(crawlerId)
 
 	for len(links) < 15 {
@@ -150,8 +148,6 @@ func (tm *TaskManager) handlePostLinks(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	fmt.Println("links len: ", len(filteredLinks))
-
 	tm.Prioritize(filteredLinks)
 	tm.Router()
 
@@ -217,7 +213,10 @@ func (tm *TaskManager) checkRedis(N int) {
 func (tm *TaskManager) Selector(N int) []string {
 	var links []string
 	for tm.bpqs[N].Len() != 0 {
-		links = append(links, tm.bpqs[N].Pop().(*pq.Item).Value)
+		newLink := tm.bpqs[N].Pop().(*pq.Item).Value
+		if ( len(newLink) != 0 ) {
+			links = append(links, newLink)
+		}
 	}
 	tm.checkRedis(N)
 	return links
@@ -297,7 +296,7 @@ func calcPriority(timesVisited int, depth int, M int) int {
 func main() {
 	N := 4
 	M := 100
-	L := int64(4e4)
+	L := int64(5e5)
 	taskManager := NewTaskManager(N, M, L)
 
 	for i := 1; i < N+1; i++ {
