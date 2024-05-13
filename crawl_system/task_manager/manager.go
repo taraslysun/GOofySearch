@@ -130,7 +130,6 @@ func (tm *TaskManager) handlePostLinks(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	}
-	// fmt.Println("links from post: ", links)
 
 	tm.Prioritize(links)
 	tm.Router()
@@ -197,6 +196,10 @@ func (tm *TaskManager) Router() {
 		fpqLen := fpq.Len()
 		for k := 0; k < fpqLen; k++ {
 			link := fpq.Pop().(*pq.Item)
+
+			if ( len(link.Value) == 0 ) {
+				continue
+			}
 			cntMap[strings.Split(link.Value, "/")[2]]++
 			var pushed bool
 			for _, q := range tm.bpqs {

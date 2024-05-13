@@ -56,21 +56,23 @@ func (n *MasterNode) Init(masterIp string, numWorkers int) (err error) {
         }
 
         // post to task manager
-        links := strings.Split(payload.Links, " ")
-        
-        jsonLinks, err := json.Marshal(links)
-        if err != nil {
-            log.Fatal(err)
+        links := strings.Split(payload.Links, "~")
+        if ( len(links) != 0 ) {
+            jsonLinks, err := json.Marshal(links)
+            if err != nil {
+                log.Fatal(err)
+            }
+    
+            client := &http.Client{}
+    
+            req, err := http.NewRequest("POST", "http://localhost:8080/links", bytes.NewBuffer(jsonLinks))
+            req.Header.Set("Content-Type", "application/json")
+    
+            client.Do(req)
+    
+            c.AbortWithStatus(http.StatusOK)
         }
-
-        client := &http.Client{}
-
-        req, err := http.NewRequest("POST", "http://localhost:8080/links", bytes.NewBuffer(jsonLinks))
-	    req.Header.Set("Content-Type", "application/json")
-
-        client.Do(req)
-
-        c.AbortWithStatus(http.StatusOK)
+        
         
     })
 

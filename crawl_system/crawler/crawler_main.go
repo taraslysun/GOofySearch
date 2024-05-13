@@ -250,17 +250,16 @@ func CrawlerMain(startLinks []string, numLinks int, es *elasticsearch.Client, ma
 	go ProcessCrawledLinks(pendingLinksChannel, crawledLinksChannel, linksAmountChannel)
 
 	var links []string
+	var linksMap = make(map[string]struct{})
 
 	for link := range pendingLinksChannel {
-		links = append(links, link)
+		if _, ok := linksMap[link]; !ok {
+			links = append(links, link)
+			linksMap[link] = struct{}{} 
+		}
 	}
 
-	// fmt.Println("Amount of links: ", len(links))
-	// if len(links) == 0 {
-	// 	return
-	// }
-
-	linksStr := strings.Join(links, " ")
+	linksStr := strings.Join(links, "~")
 
 	payload := map[string]string{
 		"links": linksStr,
@@ -270,6 +269,8 @@ func CrawlerMain(startLinks []string, numLinks int, es *elasticsearch.Client, ma
 		fmt.Println("Error marshaling JSON:", err)
 		return
 	}
+
+	fmt.Println("Amount of links: ", len(links))
 
 	resp, err := http.Post("http://" + masterIp+ ":9092/links", "application/json", bytes.NewBuffer(jsonPayload))
 	if err != nil {
