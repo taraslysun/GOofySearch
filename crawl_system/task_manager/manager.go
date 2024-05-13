@@ -80,6 +80,8 @@ func (tm *TaskManager) handleGetLinks(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Cannot convert id to int", http.StatusBadRequest)
 	}
 
+	fmt.Println("Get")
+
 	links := tm.Selector(crawlerId)
 
 	for len(links) < 15 {
@@ -137,10 +139,20 @@ func (tm *TaskManager) handlePostLinks(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	}
 
+
+	var filteredLinks []string
+
 	for _, link := range links {
-		tm.addToMap(link)
+		if _, ok := tm.chkMap[link]; !ok {
+			filteredLinks = append(filteredLinks, link)
+		} else {
+			tm.addToMap(link)
+		}
 	}
-	tm.Prioritize(links)
+
+	fmt.Println("links len: ", len(filteredLinks))
+
+	tm.Prioritize(filteredLinks)
 	tm.Router()
 
 	w.Header().Set("Content-Type", "application/json")
@@ -283,9 +295,9 @@ func calcPriority(timesVisited int, depth int, M int) int {
 // -----------------------------------------------------------
 
 func main() {
-	N := 8
+	N := 4
 	M := 100
-	L := int64(2e4)
+	L := int64(4e4)
 	taskManager := NewTaskManager(N, M, L)
 
 	for i := 1; i < N+1; i++ {
