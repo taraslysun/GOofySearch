@@ -50,13 +50,12 @@ func IndexData(title, pageText, link string, es *elasticsearch.Client) {
 	}
 
 	req := esapi.IndexRequest{
-		Index:      "crawl_data",
+		Index:      "test1",
 		DocumentID: strconv.Itoa(int(id.Get())),
 		Body:       bytes.NewReader(body),
 		Refresh:    "true",
 	}
-	// id++
-	// AtomicId.Increment()
+
 	id.Increment()
 
 	res, err := req.Do(context.Background(), es)
@@ -75,5 +74,6 @@ func IndexData(title, pageText, link string, es *elasticsearch.Client) {
 		fmt.Println("Failed to index document:", res.Status())
 		return
 	}
+
 
 }
