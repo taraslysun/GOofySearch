@@ -246,7 +246,7 @@ func CrawlerMain(startLinks []string, numLinks int, es *elasticsearch.Client) {
 		return
 	}
 
-	resp, err := http.Post("http://10.10.230.30:9092/links", "application/json", bytes.NewBuffer(jsonPayload))
+	resp, err := http.Post("http://10.10.230.138:9092/links", "application/json", bytes.NewBuffer(jsonPayload))
 	if err != nil {
 		fmt.Println("Error making POST request:", err)
 		return
