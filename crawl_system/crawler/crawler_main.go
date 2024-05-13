@@ -73,7 +73,7 @@ func ProcessCrawledLinks(pendingLinksChannel chan string, crawledLinksChannel ch
 func getResponse(link *string, agent string) *http.Response {
 	req, err := http.NewRequest("GET", *link, nil)
 	if err != nil {
-		panic(err)
+		return nil
 	}
 
 	req.Header.Set("User-Agent", agent)
