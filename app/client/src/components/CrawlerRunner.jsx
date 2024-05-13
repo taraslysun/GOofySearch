@@ -229,6 +229,10 @@ function CrawlerRunner() {
 
     const handleEsSubmit = async () => {
         await axios.post("http://localhost:3000/api/api_credentials", esCredentials);
+        setEsCredentials({
+            cloud_id: '',
+            api_key: '',
+        });
         alert("Elasticsearch credentials updated!");
     };
 
