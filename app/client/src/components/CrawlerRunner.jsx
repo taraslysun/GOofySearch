@@ -120,7 +120,7 @@ function CrawlerRunner() {
                             <li>Is Host: {credential.is_host.toString()}</li>
                             <li>Path to Task Manager: {credential.path_to_task_manager}</li>
                         </ul>
-                        <button onClick={() => handleDelete(index)}>Delete</button>
+                        <button onClick={() => handleDelete(index)} class = "btn-delete">Delete</button>
 
                     </div>
                 ))}

@@ -146,7 +146,53 @@
     border-color: black;
 }
 
-.list-objs {
+.third {
+    margin-top: 5vw;
     display: flex;
     flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    height: max-content;
+    width: 50vw;
+    background-color: lightgray;
+    color: black;
+    padding: 4vw 0vw 4vw 0vw;
+    border-radius: 2vw;
+}
+
+.second {
+    margin-top: 5vw;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    height: max-content;
+    width: 50vw;
+    background-color: lightgray;
+    color: black;
+    padding: 4vw 0vw 4vw 0vw;
+    border-radius: 2vw;
+}
+
+.list-objs {
+    padding: 1vw;
+    border-radius: 2vw;
+    background-color: gray;
+    display: flex;
+    flex-direction: column;
+    margin-left: -20vw;
+    margin-top: 2vw;
+    color: lightgray;
+}
+
+.btn-delete {
+    width: 11vw;
+    height: 3vw;
+    padding: 1vw;
+    border-radius: 5vw;
+    border-color: transparent;
+    cursor: pointer;
+    transition: 200ms;
+    font-weight: 400;
+    font-size: 1vw;
 }
