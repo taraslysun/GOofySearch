@@ -93,7 +93,7 @@ function CrawlerRunner() {
     return (
         <div className="main">
             {/* Elasticsearch Credentials Form */}
-            <div className="first">
+            <div className="third">
                 <input type="text" name="cloud_id" placeholder="Elasticsearch Cloud ID" value={esCredentials.cloud_id} onChange={handleChange} className="text-input"/>
                 <input type="text" name="api_key" placeholder="Elasticsearch API Key" value={esCredentials.api_key} onChange={handleChange} className="text-input"/>
                 <button onClick={handleEsSubmit} class = "btn-elastic">Set Elasticsearch Credentials</button>
@@ -112,17 +112,7 @@ function CrawlerRunner() {
             </div>
             <div className="second">
                 {credentials.map((credential, index) => (
-                    <div key={index} style={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                        height: '30vh',
-                        width: '30%',
-                        margin: 'auto',
-                        backgroundColor: 'lightgray',
-                        color: 'black',
-                    }}>
+                    <div key={index} className="list-objs">
                         <ul>
                             <li>IP: {credential.ip}</li>
                             <li>Username: {credential.username}</li>

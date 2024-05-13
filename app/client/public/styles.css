@@ -3,20 +3,30 @@
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    height: 100vw;
-    width: 100vw;
-    background-color: gray;
-    color: black;
-    padding-bottom: 5vw;
+    background-color: grey;
 }
 
-.first, .second {
+.first {
     margin-top: 5vw;
     display: flex;
     flex-direction: column;
     justify-content: center;
     align-items: center;
     height: 38vw;
+    width: 50vw;
+    background-color: lightgray;
+    color: black;
+    padding: 4vw 0vw 4vw 0vw;
+    border-radius: 2vw;
+}
+
+.third {
+    margin-top: 5vw;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    height: 15vw;
     width: 50vw;
     background-color: lightgray;
     color: black;
@@ -77,7 +87,6 @@
 .btn-elastic {
     width: 13vw;
     height: 5vw;
-    margin-left: 5vw;
     padding: 1vw;
     border-radius: 5vw;
     border-color: transparent;
@@ -130,9 +139,14 @@
     border-color: transparent;
     transition: 300ms;
     cursor: pointer;
+    margin-bottom: 5vw;
 }
 
 .btn-run:hover {
     border-color: black;
 }
 
+.list-objs {
+    display: flex;
+    flex-direction: column;
+}
