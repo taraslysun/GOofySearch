@@ -88,7 +88,7 @@ func (n *MasterNode) Init(masterIp string, numWorkers int) (err error) {
         n.DistributeLinks(i+1)
     }
     // create es client
-    es := crawler.Setup()
+    es := crawler.Setup(0)
     go crawler.MasterCrawler(es, n.masterIP)
 
     return nil

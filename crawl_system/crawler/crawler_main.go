@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 	"encoding/json"
 	"bytes"
@@ -17,7 +18,23 @@ import (
 	"log"
 )
 
-var id = 0
+type AtomicId struct {
+	value int64
+}
+
+func (id *AtomicId) Get() int64 {
+	return atomic.LoadInt64(&id.value)
+}
+
+func (id *AtomicId) Set(val int64) {
+	atomic.StoreInt64(&id.value, val)
+}
+
+func (id *AtomicId) Increment() int64 {
+	return atomic.AddInt64(&id.value, 1)
+}
+
+var id AtomicId
 
 func LinkToChannel(link *string, wgLinks *sync.WaitGroup, crawledLinksChannel chan string, linksAmountChannel chan int) {
 	crawledLinksChannel <- *link
@@ -174,7 +191,7 @@ func extractContent(link *string, wgLinks *sync.WaitGroup, crawledLinksChannel c
 		}
 	}
 	if title != "" && pageText != "" {
-		fmt.Println(strconv.Itoa(id), " Content link", *link)
+		fmt.Println(strconv.Itoa(int(id.Get())), " Content link", *link)
 		IndexData(title, pageText, *link, es)
 	}
 }
@@ -230,7 +247,7 @@ func CrawlerMain(startLinks []string, numLinks int, es *elasticsearch.Client, ma
 		links = append(links, link)
 	}
 
-	fmt.Println("Amount of links: ", len(links))
+	// fmt.Println("Amount of links: ", len(links))
 	// if len(links) == 0 {
 	// 	return
 	// }
@@ -276,8 +293,6 @@ func MasterCrawler(es *elasticsearch.Client, masterIp string) {
 				q.Add("CID", strconv.Itoa(id))
 				res.URL.RawQuery = q.Encode()
 
-				fmt.Println(res.URL)
-
 				resp, err := client.Do(res)
 				if err != nil {
 					log.Fatal(err)
@@ -305,21 +320,10 @@ func MasterCrawler(es *elasticsearch.Client, masterIp string) {
 				}
 
 				CrawlerMain(links, len(links), es, masterIp)
-				fmt.Println("")
 			}(1)
 
 		}
 		wg.Wait()
 
-		// notify master node
-		resp, err := http.Get("http://"+ masterIp+":9092/notify")
-        if err != nil {
-          log.Fatal(err)
-        }
-    
-        err = resp.Body.Close()
-        if err != nil {
-          log.Fatal(err)
-        }
 	}
 }

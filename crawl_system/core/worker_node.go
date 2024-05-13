@@ -41,7 +41,7 @@ func (n *WorkerNode) Start() {
     fmt.Println("worker node started")
 
     // create es client
-    es := crawler.Setup()
+    es := crawler.Setup(int64(5000000 * (n.ID-1)))
 
     // report status
     _, _ = n.c.ReportStatus(context.Background(), &Request{})
