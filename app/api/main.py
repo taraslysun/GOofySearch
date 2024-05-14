@@ -101,7 +101,30 @@ def search():
             },
         },
     })
-    return jsonify(res['hits']['hits'])
+    res1 = es.search(index="dmytro_table", body={
+        "query": {
+            "bool": {
+                "should": [
+                    {"match": {"text": {"query": query, "boost": 1}}},
+                    {"match": {"title": {"query": query, "boost": 3}}},
+                ]
+            },
+        },
+    })
+    res2 = es.search(index="sviat", body={
+        "query": {
+            "bool": {
+                "should": [
+                    {"match": {"text": {"query": query, "boost": 1}}},
+                    {"match": {"title": {"query": query, "boost": 3}}},
+                ]
+            },
+        },
+    })
+    small = list(res['hits']['hits'])
+    small.extend(list(res1['hits']['hits']))
+    small.extend(list(res2['hits']['hits']))
+    return jsonify(small)
 
 @app.route('/api/execute_ssh', methods=['POST'])
 def execute_ssh():
