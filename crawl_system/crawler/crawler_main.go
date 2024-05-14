@@ -1,20 +1,20 @@
-package main
+package crawler
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"math/rand"
 	"net/http"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+	"encoding/json"
+	"bytes"
 
 	"github.com/elastic/go-elasticsearch/v7"
 	"golang.org/x/net/html"
+	"log"
 )
 
 var id = 0
@@ -192,7 +192,7 @@ func CrawlWebpage(wg *sync.WaitGroup, pendingLinksChannel chan string,
 	wg.Done()
 }
 
-func CrawlerMain(startLinks []string, numLinks int, es *elasticsearch.Client, mu *sync.Mutex) {
+func CrawlerMain(startLinks []string, numLinks int, es *elasticsearch.Client) {
 	pendingLinksChannel := make(chan string, 100)
 	crawledLinksChannel := make(chan string, 100000)
 	linksAmountChannel := make(chan int, 100)
@@ -230,90 +230,96 @@ func CrawlerMain(startLinks []string, numLinks int, es *elasticsearch.Client, mu
 		links = append(links, link)
 	}
 
-	jsonLinks, err := json.Marshal(links)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	client := &http.Client{}
 	fmt.Println("Amount of links: ", len(links))
-	if len(links) == 0 {
+	// if len(links) == 0 {
+	// 	return
+	// }
+
+	linksStr := strings.Join(links, " ")
+
+	payload := map[string]string{
+		"links": linksStr,
+	}
+	jsonPayload, err := json.Marshal(payload)
+	if err != nil {
+		fmt.Println("Error marshaling JSON:", err)
 		return
 	}
-	req, err := http.NewRequest("POST", "http://localhost:8080/links", bytes.NewBuffer(jsonLinks))
-	req.Header.Set("Content-Type", "application/json")
 
-	mu.Lock()
-	client.Do(req)
-	mu.Unlock()
+	resp, err := http.Post("http://10.10.230.138:9092/links", "application/json", bytes.NewBuffer(jsonPayload))
+	if err != nil {
+		fmt.Println("Error making POST request:", err)
+		return
+	}
+	defer resp.Body.Close()
+
 }
 
-// ManageCrawler basically handles GET Request
-func ManageCrawler(numThreads int, manager string, es *elasticsearch.Client) {
+
+func MasterCrawler(es *elasticsearch.Client, masterIp string) {
 	client := &http.Client{}
 	var wg sync.WaitGroup
-	var mu sync.Mutex
 
-	for i := 1; i <= numThreads; i++ {
-		wg.Add(1)
+	for {
+		for i := 1; i <= 5; i++ {
+			wg.Add(1)
 
-		go func(id int) {
-			defer wg.Done()
+			go func(id int) {
+				defer wg.Done()
 
-			res, err := http.NewRequest("GET", manager, nil)
-			if err != nil {
-				log.Fatal(err)
-			}
-
-			q := res.URL.Query()
-			q.Add("CID", strconv.Itoa(id))
-			res.URL.RawQuery = q.Encode()
-
-			fmt.Println(res.URL)
-
-			resp, err := client.Do(res)
-			if err != nil {
-				log.Fatal(err)
-			}
-			defer func(Body io.ReadCloser) {
-				err := Body.Close()
+				res, err := http.NewRequest("GET", "http://localhost:8080/links", nil)
 				if err != nil {
 					log.Fatal(err)
 				}
-			}(resp.Body)
 
-			body, err := io.ReadAll(resp.Body)
-			if err != nil {
-				log.Fatal(err)
-			}
+				q := res.URL.Query()
+				q.Add("CID", strconv.Itoa(id))
+				res.URL.RawQuery = q.Encode()
 
-			var links []string
-			err = json.Unmarshal(body, &links)
-			if err != nil {
-				log.Fatal(err)
-			}
+				fmt.Println(res.URL)
 
-			if len(links) == 0 {
-				return
-			}
+				resp, err := client.Do(res)
+				if err != nil {
+					log.Fatal(err)
+				}
+				defer func(Body io.ReadCloser) {
+					err := Body.Close()
+					if err != nil {
+						log.Fatal(err)
+					}
+				}(resp.Body)
 
-			// fmt.Println("Links: ", len(links))
-			CrawlerMain(links, len(links), es, &mu)
-			fmt.Println("")
-		}(i)
-	}
+				body, err := io.ReadAll(resp.Body)
+				if err != nil {
+					log.Fatal(err)
+				}
 
-	wg.Wait()
-}
+				var links []string
+				err = json.Unmarshal(body, &links)
+				if err != nil {
+					log.Fatal(err)
+				}
 
-func main() {
-	es := Setup()
-	fmt.Println("Crawl started!...")
+				if len(links) == 0 {
+					return
+				}
 
-	i := 0
-	for {
-		ManageCrawler(8, "http://localhost:8080/links", es)
-		fmt.Println("Iteration:", i)
-		i++
+				CrawlerMain(links, len(links), es)
+				fmt.Println("")
+			}(1)
+
+		}
+		wg.Wait()
+
+		// notify master node
+		resp, err := http.Get("http://"+ masterIp+":9092/notify")
+        if err != nil {
+          log.Fatal(err)
+        }
+    
+        err = resp.Body.Close()
+        if err != nil {
+          log.Fatal(err)
+        }
 	}
 }
