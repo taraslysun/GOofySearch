@@ -91,7 +91,7 @@ def search_and_rank():
 def search():
     query = request.json.get('query')
     print(query)
-    res = es.search(index="final_data", body={
+    res = es.search(index="final_data, dmytro_table, sviat", body={
         "query": {
             "bool": {
                 "should": [
@@ -101,30 +101,7 @@ def search():
             },
         },
     })
-    res1 = es.search(index="dmytro_table", body={
-        "query": {
-            "bool": {
-                "should": [
-                    {"match": {"text": {"query": query, "boost": 1}}},
-                    {"match": {"title": {"query": query, "boost": 3}}},
-                ]
-            },
-        },
-    })
-    res2 = es.search(index="sviat", body={
-        "query": {
-            "bool": {
-                "should": [
-                    {"match": {"text": {"query": query, "boost": 1}}},
-                    {"match": {"title": {"query": query, "boost": 3}}},
-                ]
-            },
-        },
-    })
-    small = list(res['hits']['hits'])
-    small.extend(list(res1['hits']['hits']))
-    small.extend(list(res2['hits']['hits']))
-    return jsonify(small)
+    return jsonify(res['hits']['hits'])
 
 @app.route('/api/execute_ssh', methods=['POST'])
 def execute_ssh():
