@@ -5,7 +5,6 @@ import (
     "google.golang.org/grpc"
     "net"
     "net/http"
-    "fmt"
     "encoding/json"
     "strings"
     "bytes"
@@ -57,21 +56,23 @@ func (n *MasterNode) Init(masterIp string, numWorkers int) (err error) {
         }
 
         // post to task manager
-        links := strings.Split(payload.Links, " ")
-        
-        jsonLinks, err := json.Marshal(links)
-        if err != nil {
-            log.Fatal(err)
+        links := strings.Split(payload.Links, "~")
+        if ( len(links) != 0 ) {
+            jsonLinks, err := json.Marshal(links)
+            if err != nil {
+                log.Fatal(err)
+            }
+    
+            client := &http.Client{}
+    
+            req, err := http.NewRequest("POST", "http://localhost:8080/links", bytes.NewBuffer(jsonLinks))
+            req.Header.Set("Content-Type", "application/json")
+    
+            client.Do(req)
+    
+            c.AbortWithStatus(http.StatusOK)
         }
-
-        client := &http.Client{}
-
-        req, err := http.NewRequest("POST", "http://localhost:8080/links", bytes.NewBuffer(jsonLinks))
-	    req.Header.Set("Content-Type", "application/json")
-
-        client.Do(req)
-
-        c.AbortWithStatus(http.StatusOK)
+        
         
     })
 
@@ -89,7 +90,7 @@ func (n *MasterNode) Init(masterIp string, numWorkers int) (err error) {
         n.DistributeLinks(i+1)
     }
     // create es client
-    es := crawler.Setup()
+    es := crawler.Setup(0)
     go crawler.MasterCrawler(es, n.masterIP)
 
     return nil
@@ -149,7 +150,6 @@ func (n *MasterNode) DistributeLinks(id int) {
     joined := strings.Join(links, " ")
 
     // move links to LinksChannel
-    fmt.Println("moving links to links channel, len: ", len(links))
     n.nodeSvr.LinksChannel <- joined
 }
 

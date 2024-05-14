@@ -18,7 +18,7 @@ var CFG = elasticsearch.Config{
 	APIKey:  "NFBZcGFJOEJ1WDg3RXdUSUlaX2o6M0hsZkdsWGlSeEtZc1M0NGpqUXkzZw==",
 }
 
-func Setup() *elasticsearch.Client {
+func Setup(startId int64) *elasticsearch.Client {
 	es, err := elasticsearch.NewClient(CFG)
 	if err != nil {
 		log.Fatalf("Error creating the client: %s", err)
@@ -30,6 +30,8 @@ func Setup() *elasticsearch.Client {
 	}
 
 	fmt.Println(infores)
+	id.Set(startId)
+
 
 	return es
 }
@@ -48,12 +50,13 @@ func IndexData(title, pageText, link string, es *elasticsearch.Client) {
 	}
 
 	req := esapi.IndexRequest{
-		Index:      "crawl_data",
-		DocumentID: strconv.Itoa(id),
+		Index:      "final_data",
+		DocumentID: strconv.Itoa(int(id.Get())),
 		Body:       bytes.NewReader(body),
 		Refresh:    "true",
 	}
-	id++
+
+	id.Increment()
 
 	res, err := req.Do(context.Background(), es)
 	if err != nil {
@@ -71,5 +74,6 @@ func IndexData(title, pageText, link string, es *elasticsearch.Client) {
 		fmt.Println("Failed to index document:", res.Status())
 		return
 	}
+
 
 }

@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 	"encoding/json"
 	"bytes"
@@ -17,7 +18,23 @@ import (
 	"log"
 )
 
-var id = 0
+type AtomicId struct {
+	value int64
+}
+
+func (id *AtomicId) Get() int64 {
+	return atomic.LoadInt64(&id.value)
+}
+
+func (id *AtomicId) Set(val int64) {
+	atomic.StoreInt64(&id.value, val)
+}
+
+func (id *AtomicId) Increment() int64 {
+	return atomic.AddInt64(&id.value, 1)
+}
+
+var id AtomicId
 
 func LinkToChannel(link *string, wgLinks *sync.WaitGroup, crawledLinksChannel chan string, linksAmountChannel chan int) {
 	crawledLinksChannel <- *link
@@ -56,7 +73,7 @@ func ProcessCrawledLinks(pendingLinksChannel chan string, crawledLinksChannel ch
 func getResponse(link *string, agent string) *http.Response {
 	req, err := http.NewRequest("GET", *link, nil)
 	if err != nil {
-		panic(err)
+		return nil
 	}
 
 	req.Header.Set("User-Agent", agent)
@@ -105,7 +122,7 @@ func RandomString(userAgentList []string) string {
 }
 
 func extractContent(link *string, wgLinks *sync.WaitGroup, crawledLinksChannel chan string,
-	es *elasticsearch.Client, linksAmountChannel chan int) {
+	es *elasticsearch.Client, linksAmountChannel chan int, wgIndex *sync.WaitGroup) {
 	userAgentList := []string{
 		"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/93.0.4577.82 Safari/537.36",
 		"Mozilla/5.0 (iPhone; CPU iPhone OS 14_4_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0.3 Mobile/15E148 Safari/604.1",
@@ -174,30 +191,37 @@ func extractContent(link *string, wgLinks *sync.WaitGroup, crawledLinksChannel c
 		}
 	}
 	if title != "" && pageText != "" {
-		fmt.Println(strconv.Itoa(id), " Content link", *link)
-		IndexData(title, pageText, *link, es)
+		fmt.Println(strconv.Itoa(int(id.Get())), " Content link", *link)
+		wgIndex.Add(1)
+		go func() {
+			IndexData(title, pageText, *link, es)
+		}()
+		wgIndex.Done()
+
 	}
 }
 
 func CrawlWebpage(wg *sync.WaitGroup, pendingLinksChannel chan string,
-	crawledLinksChannel chan string, linksAmountChannel chan int, es *elasticsearch.Client) {
+	crawledLinksChannel chan string, linksAmountChannel chan int, es *elasticsearch.Client, wgIndex *sync.WaitGroup) {
 
 	var wgLinks sync.WaitGroup
 
 	link := <-pendingLinksChannel
-	extractContent(&link, &wgLinks, crawledLinksChannel, es, linksAmountChannel)
+	extractContent(&link, &wgLinks, crawledLinksChannel, es, linksAmountChannel, wgIndex)
 	wgLinks.Wait()
 	linksAmountChannel <- -1
 
 	wg.Done()
 }
 
-func CrawlerMain(startLinks []string, numLinks int, es *elasticsearch.Client) {
+func CrawlerMain(startLinks []string, numLinks int, es *elasticsearch.Client, masterIp string) {
 	pendingLinksChannel := make(chan string, 100)
 	crawledLinksChannel := make(chan string, 100000)
 	linksAmountChannel := make(chan int, 100)
 
 	var wgStart sync.WaitGroup
+	var wgIndex sync.WaitGroup
+	defer wgIndex.Wait()
 
 	for _, startLink := range startLinks {
 		wgStart.Add(1)
@@ -218,24 +242,24 @@ func CrawlerMain(startLinks []string, numLinks int, es *elasticsearch.Client) {
 
 	for i := 0; i < numLinks; i++ {
 		wg.Add(1)
-		go CrawlWebpage(&wg, pendingLinksChannel, crawledLinksChannel, linksAmountChannel, es)
+		go CrawlWebpage(&wg, pendingLinksChannel, crawledLinksChannel,
+			 linksAmountChannel, es, &wgIndex)
 	}
 	wg.Wait()
 
 	go ProcessCrawledLinks(pendingLinksChannel, crawledLinksChannel, linksAmountChannel)
 
 	var links []string
+	var linksMap = make(map[string]struct{})
 
 	for link := range pendingLinksChannel {
-		links = append(links, link)
+		if _, ok := linksMap[link]; !ok {
+			links = append(links, link)
+			linksMap[link] = struct{}{} 
+		}
 	}
 
-	fmt.Println("Amount of links: ", len(links))
-	// if len(links) == 0 {
-	// 	return
-	// }
-
-	linksStr := strings.Join(links, " ")
+	linksStr := strings.Join(links, "~")
 
 	payload := map[string]string{
 		"links": linksStr,
@@ -246,7 +270,7 @@ func CrawlerMain(startLinks []string, numLinks int, es *elasticsearch.Client) {
 		return
 	}
 
-	resp, err := http.Post("http://10.10.230.138:9092/links", "application/json", bytes.NewBuffer(jsonPayload))
+	resp, err := http.Post("http://" + masterIp+ ":9092/links", "application/json", bytes.NewBuffer(jsonPayload))
 	if err != nil {
 		fmt.Println("Error making POST request:", err)
 		return
@@ -276,8 +300,6 @@ func MasterCrawler(es *elasticsearch.Client, masterIp string) {
 				q.Add("CID", strconv.Itoa(id))
 				res.URL.RawQuery = q.Encode()
 
-				fmt.Println(res.URL)
-
 				resp, err := client.Do(res)
 				if err != nil {
 					log.Fatal(err)
@@ -304,22 +326,11 @@ func MasterCrawler(es *elasticsearch.Client, masterIp string) {
 					return
 				}
 
-				CrawlerMain(links, len(links), es)
-				fmt.Println("")
+				CrawlerMain(links, len(links), es, masterIp)
 			}(1)
 
 		}
 		wg.Wait()
 
-		// notify master node
-		resp, err := http.Get("http://"+ masterIp+":9092/notify")
-        if err != nil {
-          log.Fatal(err)
-        }
-    
-        err = resp.Body.Close()
-        if err != nil {
-          log.Fatal(err)
-        }
 	}
 }

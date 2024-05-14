@@ -2,11 +2,11 @@ package main
 
 import (
 	"context"
+	pq "dcs/task_manager/priority_queue"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
-	pq "dcs/task_manager/priority_queue"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -26,9 +26,12 @@ type TaskManager struct {
 	redisClient  redis.Client
 	ctx          context.Context
 	redisQueue   string
+	chkMap       map[string]bool
+	chkMapSz     int64
+	curMapSz     int64
 }
 
-func NewTaskManager(N int, M int) *TaskManager {
+func NewTaskManager(N int, M int, chkMapsz int64) *TaskManager {
 
 	var fpqs []*pq.PriorityQueue
 	var bpqs []*pq.PriorityQueue
@@ -47,6 +50,9 @@ func NewTaskManager(N int, M int) *TaskManager {
 		redisClient:  *newRedisClient(),
 		ctx:          newCtx(),
 		redisQueue:   "redisQueue",
+		chkMap:       make(map[string]bool),
+		chkMapSz:     chkMapsz,
+		curMapSz:     0,
 	}
 }
 
@@ -130,9 +136,19 @@ func (tm *TaskManager) handlePostLinks(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	}
-	// fmt.Println("links from post: ", links)
 
-	tm.Prioritize(links)
+
+	var filteredLinks []string
+
+	for _, link := range links {
+		if _, ok := tm.chkMap[link]; !ok {
+			filteredLinks = append(filteredLinks, link)
+		} else {
+			tm.addToMap(link)
+		}
+	}
+
+	tm.Prioritize(filteredLinks)
 	tm.Router()
 
 	w.Header().Set("Content-Type", "application/json")
@@ -140,6 +156,24 @@ func (tm *TaskManager) handlePostLinks(w http.ResponseWriter, r *http.Request) {
 }
 
 // -----------------------------------------------------------
+
+func (tm *TaskManager) addToMap(link string) {
+	if tm.curMapSz > tm.chkMapSz {
+		for key := range tm.chkMap {
+			delete(tm.chkMap, key)
+		}
+		tm.chkMap[link] = true
+		tm.curMapSz = 1
+
+	} else {
+		if tm.chkMap[link] {
+			return
+		} else {
+			tm.chkMap[link] = true
+			tm.curMapSz++
+		}
+	}
+}
 
 func (tm *TaskManager) checkRedis(N int) {
 
@@ -171,7 +205,6 @@ func (tm *TaskManager) checkRedis(N int) {
 				break
 			}
 			tm.bpqs[N].Push(&pq.Item{Value: link.Member.(string), Priority: int(link.Score)})
-
 		}
 	}
 	fmt.Println()
@@ -179,13 +212,13 @@ func (tm *TaskManager) checkRedis(N int) {
 
 func (tm *TaskManager) Selector(N int) []string {
 	var links []string
-
 	for tm.bpqs[N].Len() != 0 {
-		links = append(links, tm.bpqs[N].Pop().(*pq.Item).Value)
+		newLink := tm.bpqs[N].Pop().(*pq.Item).Value
+		if ( len(newLink) != 0 ) {
+			links = append(links, newLink)
+		}
 	}
-
 	tm.checkRedis(N)
-
 	return links
 }
 
@@ -197,6 +230,10 @@ func (tm *TaskManager) Router() {
 		fpqLen := fpq.Len()
 		for k := 0; k < fpqLen; k++ {
 			link := fpq.Pop().(*pq.Item)
+
+			if len(link.Value) == 0 {
+				continue
+			}
 			cntMap[strings.Split(link.Value, "/")[2]]++
 			var pushed bool
 			for _, q := range tm.bpqs {
@@ -240,9 +277,10 @@ func (tm *TaskManager) Prioritize(links []string) {
 		hostname := domain.Hostname()
 		timesVisited := tm.timesVisited[hostname]
 		priority := calcPriority(timesVisited, depth, len(tm.fpqs))
-		tm.fpqs[priority-1].Push(&pq.Item{
-			Priority: priority,
-			Value:    link},
+		tm.fpqs[priority-1].Push(
+			&pq.Item{
+				Priority: priority,
+				Value:    link},
 		)
 		tm.timesVisited[hostname]++
 	}
@@ -256,9 +294,10 @@ func calcPriority(timesVisited int, depth int, M int) int {
 // -----------------------------------------------------------
 
 func main() {
-	N := 8
+	N := 4
 	M := 100
-	taskManager := NewTaskManager(N, M)
+	L := int64(5e5)
+	taskManager := NewTaskManager(N, M, L)
 
 	for i := 1; i < N+1; i++ {
 		taskManager.checkRedis(i)
