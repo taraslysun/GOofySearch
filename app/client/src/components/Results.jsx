@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 
-function Results({ query }) {
+function Results({ query, sortByPagerank }) {
   const [data, setData] = useState([]);
 
   useEffect(() => {
@@ -10,8 +10,10 @@ function Results({ query }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query: query }),
       };
+      const link = sortByPagerank ? "http://localhost:3000/api/search_pagerank" : "http://localhost:3000/api/search";
+      console.log(link);
       const response = await fetch(
-        "http://18.153.79.179:3000/api/search",
+        link,
         requestOptions
       );
       const result = await response.json();
@@ -23,13 +25,13 @@ function Results({ query }) {
     };
 
     fetchData();
-  }, [query]);
+  }, [query, sortByPagerank]);
 
-  for (let i = 0; i < data.length; i++) {
-    console.log(data[i]["_id"]);
-    console.log(data[i]["_source"]);
+  // for (let i = 0; i < data.length; i++) {
+    // console.log(data[i]["_id"]);
+    // console.log(data[i]["_source"]);
     // console.log(data[i]);
-  }
+  // }
 
   return (
     <div className="results">
