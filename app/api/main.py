@@ -91,7 +91,7 @@ def search_and_rank():
 def search():
     query = request.json.get('query')
     print(query)
-    res = es.search(index="final_data, dmytro_table, sviat", body={
+    res = es.search(index="final_data", body={
         "query": {
             "bool": {
                 "should": [
