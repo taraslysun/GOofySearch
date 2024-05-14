@@ -7,9 +7,13 @@ import shlex
 
 app = Flask(__name__)
 CORS(app)
+CLOUD_ID = "mini-google:ZXVyb3BlLXdlc3Q5LmdjcC5lbGFzdGljLWNsb3VkLmNvbTo0NDMkZWRhMWY0MTkyZmJiNGM3YjhiNDQ2ODk4NjBiNGMyNTckOTUzOThlMjVmNjdmNDA4MzhiYzJhOTE4ODAyZDZjYmI="
+API_KEY = "NFBZcGFJOEJ1WDg3RXdUSUlaX2o6M0hsZkdsWGlSeEtZc1M0NGpqUXkzZw=="
 
+# Initialize Elasticsearch client
+es = Elasticsearch(cloud_id=CLOUD_ID, api_key=API_KEY, node_class='requests')
 
-@app.route('/api/api_credentials', methods=['POST'])
+@app.route('/api/api_credentials', methods=['POST', 'GET'])
 def api_credentials():
     data = request.json
     CLOUD_ID = data['cloud_id']
@@ -23,7 +27,8 @@ def api_credentials():
 @app.route('/api/search', methods=['POST', 'GET'])
 def search():
     query = request.json.get('query')
-    res = es.search(index="test", body={
+    print(query)
+    res = es.search(index="final_data", body={
         "query": {
             "bool": {
                 "should": [
@@ -33,6 +38,7 @@ def search():
             },
         },
     })
+    #print(res['hits']['hits'])
     return jsonify(res['hits']['hits'])
 
 @app.route('/api/execute_ssh', methods=['POST'])

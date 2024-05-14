@@ -15,7 +15,8 @@ function Results({ query }) {
         requestOptions
       );
       const result = await response.json();
-      let hits = result.hits.hits;
+      console.log(result)
+      let hits = result;
 
       hits = hits.filter((hit) => hit["_source"]["title"] != "");
 
