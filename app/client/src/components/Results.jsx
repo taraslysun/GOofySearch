@@ -20,16 +20,9 @@ function Results({ query, sortByPagerank }) {
       let hits = result;
 
       hits = hits.filter((hit) => hit["_source"]["title"] != "");
-      const uniqueLinks = new Set();
-      hits.forEach(hit => {
-      if (hit["_source"]["link"]) {
-          uniqueLinks.add(hit);
-        }
-      });
 
 // Convert Set back to an array (if needed)
-      const uniqueLinksArray = Array.from(uniqueLinks);
-      setData(uniqueLinksArray);
+      setData(hits);
     };
 
     fetchData();
