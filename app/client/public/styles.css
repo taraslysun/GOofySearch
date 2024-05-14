@@ -1,0 +1,198 @@
+.main {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    background-color: grey;
+}
+
+.first {
+    margin-top: 5vw;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    height: 38vw;
+    width: 50vw;
+    background-color: lightgray;
+    color: black;
+    padding: 4vw 0vw 4vw 0vw;
+    border-radius: 2vw;
+}
+
+.third {
+    margin-top: 5vw;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    height: 15vw;
+    width: 50vw;
+    background-color: lightgray;
+    color: black;
+    padding: 4vw 0vw 4vw 0vw;
+    border-radius: 2vw;
+}
+
+.text-input {
+    margin-bottom: 1vw !important;
+    border-radius: 2vw !important;
+    height: 3vw !important;
+    width: 30vw !important;
+    font-weight: 400 !important;
+    font-size: 1vw !important;
+    padding: 1vw !important;
+    padding-left: 1.5vw !important;
+}
+
+.text-input::placeholder {
+    font-weight: 400;
+    font-size: 1vw !important;
+}
+
+.pass-input {
+    width: 30.5vw;
+    height: 4vw;
+    border-radius: 1.5vw;
+    margin-bottom: 1vw;
+    padding-left: 1.5vw;
+    border-color: transparent;
+    font-weight: 400;
+    font-size: 1vw;
+}
+
+.pass-input::placeholder {
+    font-weight: 400;
+    font-size: 1vw !important;
+}
+
+.input-container {
+    margin-left: -3vw;
+    width: 30vw;
+}
+
+.btn {
+    width: 11vw;
+    height: 3vw;
+    margin-left: 5vw;
+    padding: 1vw;
+    border-radius: 5vw;
+    border-color: transparent;
+    cursor: pointer;
+    transition: 200ms;
+    font-weight: 400;
+    font-size: 1vw;
+}
+
+.btn-elastic {
+    width: 13vw;
+    height: 5vw;
+    padding: 1vw;
+    border-radius: 5vw;
+    border-color: transparent;
+    cursor: pointer;
+    transition: 200ms;
+    font-weight: 400;
+    font-size: 1vw;
+}
+
+.btn-elastic:hover {
+    border-color: black;
+}
+
+.btn::placeholder {
+    font-weight: 400;
+    font-size: 2vw;
+    width: 1vw;
+}
+
+.btn:hover {
+    border-color: black;
+}
+
+.checkbox {
+    width: 2vw !important;
+    height: 2vw !important;
+    margin: auto !important;
+    padding: auto !important;
+}
+
+.bottom {
+    transform: translateX(-3vw);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.subtitle {
+    margin-left: 1vw;
+    font-size: 1.5vw;
+}
+
+.btn-run {
+    width: 45vw;
+    height: 5vw;
+    border-radius: 2vw;
+    margin-top: 2vw;
+    font-size: 2vw;
+    background-color: cyan;
+    border-color: transparent;
+    transition: 300ms;
+    cursor: pointer;
+    margin-bottom: 5vw;
+}
+
+.btn-run:hover {
+    border-color: black;
+}
+
+.third {
+    margin-top: 5vw;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    height: max-content;
+    width: 50vw;
+    background-color: lightgray;
+    color: black;
+    padding: 4vw 0vw 4vw 0vw;
+    border-radius: 2vw;
+}
+
+.second {
+    margin-top: 5vw;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    height: max-content;
+    width: 50vw;
+    background-color: lightgray;
+    color: black;
+    padding: 4vw 0vw 4vw 0vw;
+    border-radius: 2vw;
+}
+
+.list-objs {
+    padding: 1vw;
+    border-radius: 2vw;
+    background-color: gray;
+    display: flex;
+    flex-direction: column;
+    margin-left: -20vw;
+    margin-top: 2vw;
+    color: lightgray;
+}
+
+.btn-delete {
+    width: 11vw;
+    height: 3vw;
+    padding: 1vw;
+    border-radius: 5vw;
+    border-color: transparent;
+    cursor: pointer;
+    transition: 200ms;
+    font-weight: 400;
+    font-size: 1vw;
+}
