@@ -10,7 +10,7 @@ function Results({ query, sortByPagerank }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query: query }),
       };
-      const link = sortByPagerank ? "http://localhost:3000/api/search_pagerank" : "http://localhost:3000/api/search";
+      const link = sortByPagerank ? "http://18.153.79.179:3000/api/search_pagerank" : "http://18.153.79.179:3000/api/search";
       console.log(link);
       const response = await fetch(
         link,
