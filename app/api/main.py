@@ -124,7 +124,7 @@ def search():
     small = list(res['hits']['hits'])
     small.extend(list(res1['hits']['hits']))
     small.extend(list(res2['hits']['hits']))
-    return jsonify(small)
+    return jsonify(list(set(small)))
 
 @app.route('/api/execute_ssh', methods=['POST'])
 def execute_ssh():
